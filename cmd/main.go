@@ -12,14 +12,14 @@ var defaultPrefix = " "
 func main() {
 	opts := []rediss.Option{
 		rediss.WithDatabase(1),
-		rediss.WithAddress("192.168.1.192:6379"),
-		rediss.WithPassword("tB5PV~i$7U"),
+		rediss.WithAddress("192.168.1.77:6379"),
+		//rediss.WithPassword("tB5PV~i$7U"),
 		rediss.WithPoolSize(8),
 		rediss.WithSerializer(serialize.JSON()),
 	}
 	c := rediss.New(opts...)
 
-	reply, err := c.DelKey("*")
+	reply, err := c.Keys("*")
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 		return

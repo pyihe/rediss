@@ -15,5 +15,5 @@
 # vendor/
 
 .idea/
-cmd/cmd.exe
+cmd/cmd*
 *_test.go
