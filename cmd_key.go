@@ -272,6 +272,7 @@ func (c *Client) RenameNX(key, newKey string) (*Reply, error) {
 }
 
 // Scan v2.8.0后可用
+// v6.0.0后添加TYPE参数
 // 时间复杂度: O(N), N为scan的元素数量
 // 用于迭代数据库中的key
 // SCAN 命令是一个基于游标的迭代器, 每次被调用之后, 都会向用户返回一个新的游标, 用户在下次迭代时需要使用这个新游标作为SCAN命令的游标参数, 以此来延续之前的迭代过程。
@@ -281,6 +282,7 @@ func (c *Client) RenameNX(key, newKey string) (*Reply, error) {
 // COUNT: 每次最多迭代多少个元素
 // MATCH: 只迭代给定样式的元素
 // TYPE: 遍历的值类型, 如ZSET, GEOHASH
+// 返回值类型: Array, 返回遍历的key的数组
 func (c *Client) Scan(cursor int, pattern string, count int64, valueType string) (*Reply, error) {
 	args := getArgs()
 	args.Append("SCAN", strconv.FormatInt(int64(cursor), 10))

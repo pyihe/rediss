@@ -133,7 +133,7 @@ func (c *Client) HRandField(key string, count int64, withValues bool) (*Reply, e
 // HScan v2.8.0后可用
 // 时间复杂度: O(N), 每次调用O(1), O(N)用于完整的迭代，包括足够的命令调用以使光标返回0; N是集合内的元素数。
 // 递增的遍历hash的字段以及对应的值
-// 返回值类型: Array
+// 返回值类型: Array, 数组元素为包含两个元素, 字段和字段值
 func (c *Client) HScan(key string, cursor int, pattern string, count int64, valueType string) (*Reply, error) {
 	args := getArgs()
 	args.Append("HSCAN", key, strconv.FormatInt(int64(cursor), 10))

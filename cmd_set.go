@@ -185,6 +185,7 @@ func (c *Client) SRem(key string, members ...interface{}) (*Reply, error) {
 
 // SScan v2.8.0后可用
 // 时间复杂度: O(N), N为scan结果中元素数量
+// 返回值类型: Array, 数组的元素为集合的成员
 func (c *Client) SScan(key string, cursor int64, pattern string, count int64) (*Reply, error) {
 	args := getArgs()
 	args.Append("SSCAN", key)
