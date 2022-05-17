@@ -3,6 +3,7 @@ package rediss
 import "strings"
 
 // BZMPop v7.0.0后可用
+// 命令格式: BZMPOP timeout numkeys key [key ...] MIN | MAX [COUNT count]
 // 时间复杂度: O(K)+O(N*log(M)) K为key的数量, N为有序集合中存储的成员数量, M为pop的元素数量
 // 当任何一个有序集合不为空时, BZMPOP与ZMPOP命令相同, 当所有的有序集合都为空时,
 // redis将会阻塞连接直到另一个客户端添加了成员到任意一个有序集合中
@@ -30,6 +31,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 }
 
 // BZPopMax v5.0.0后可用
+// 命令格式: BZPOPMAX key [key ...] timeout
 // 时间复杂度: O(log(N)), N为有序集合中的成员数量
 // 阻塞式的按照给定顺序从提供的有序集合中第一个非空的集合pop出分数最高的那个成员
 // 当所有有序集合都为空时, 命令将会阻塞, 直到有元素可以pop或者timeout超时, timeout表示阻塞的最长时间, 零值的timeout表示永久阻塞
@@ -45,6 +47,7 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (*Reply, error) {
 }
 
 // BZPopMin v5.0.0后可用
+// 命令格式: BZPOPMIN key [key ...] timeout
 // 时间复杂度: O(log(N)), N为有序集合中的成员数量
 // 阻塞式的按照给定顺序从提供的有序集合中第一个非空的集合pop出分数最低的那个成员
 // 当所有有序集合都为空时, 命令将会阻塞, 直到有元素可以pop或者timeout超时, timeout表示阻塞的最长时间, 零值的timeout表示永久阻塞
@@ -60,6 +63,7 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*Reply, error) {
 }
 
 // ZAdd v1.2.0后可用
+// 命令格式: ZADD key [ NX | XX] [ GT | LT] [CH] [INCR] score member [ score member ...]
 // 时间复杂度: O(log(N)), N为有序集合中的元素数量
 // 向指定有序集合中添加指定的成员
 // 如果成员早已存在于有序集合中, 成员的分数将被更新并且重新插入在正确的位置上
@@ -110,6 +114,7 @@ func (c *Client) ZAdd(key string, xOp string, tOp string, ch, incr bool, scoreMe
 }
 
 // ZCard v1.2.0后可用
+// 命令格式: ZCARD key
 // 时间复杂度: O(1)
 // 获取指定key的有序集合的基数
 // 返回值类型: Integer, 返回有序集合的基数, 如果key不存在返回0
@@ -120,6 +125,7 @@ func (c *Client) ZCard(key string) (*Reply, error) {
 }
 
 // ZCount v2.0.0后可用
+// 命令格式: ZCOUNT key min max
 // 时间复杂度: O(log(N)), N为有序集合中元素的个数
 // 获取有序集合中分数在[min, max]之间的元素个数
 // 返回值类型: Integer, 返回在指定分数范围内的元素个数
@@ -131,6 +137,7 @@ func (c *Client) ZCount(key string, min, max int64) (*Reply, error) {
 }
 
 // ZDiff v6.2.0后可用
+// 命令格式: ZDIFF numkeys key [key ...] [WITHSCORES]
 // 时间复杂度: O(L + (N-K)log(N)), L为所有有序集合的成员总数, N为第一个有序集合的成员数量, K为结果集合的成员数量
 // 获取指定有序集合之间的差异
 // 返回值类型: Array, 返回差异成员(如果提供了WITHSCORES参数, 则会携带分数)
@@ -146,6 +153,7 @@ func (c *Client) ZDiff(keys []string, withScore bool) (*Reply, error) {
 }
 
 // ZDiffStore v6.2.0后可用
+// 命令格式: ZDIFFSTORE destination numkeys key [key ...]
 // 时间复杂度: O(L + (N-K)log(N)), L为所有有序集合的成员总数, N为第一个有序集合的成员数量, K为结果集合的成员数量
 // 获取指定有序集合之间的差异, 并存储在指定的key中, 如果dst已经存在则其旧值将会被覆盖
 // 返回值类型: Integer, 返回存储进dst的元素数量
@@ -158,6 +166,7 @@ func (c *Client) ZDiffStore(dst string, keys []string) (*Reply, error) {
 }
 
 // ZIncrBy v1.2.0后可用
+// 命令格式: ZINCRBY key increment member
 // 时间复杂度: O(log(N)), N为有序集合中的元素数量
 // 对有序集合中的指定元素的分数进行增量, 如果元素不存在则会以增量为分数添加一个新元素, 如果key不存在, 则创建一个以指定成员为唯一成员的新排序集
 // 如果key持有的数据类型不是有序集合, 将会返回一个错误
@@ -170,6 +179,7 @@ func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (*Re
 }
 
 // ZInter v6.2.0后可用
+// 命令格式: ZINTER numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX] [WITHSCORES]
 // 时间复杂度: O(NK)+O(Mlog(M)), N为最小有序集合的基数, K为指定的有序集合数, M为结果集合中的元素数量
 // 计算有序集合的交集
 // 默认情况下, 一个元素的结果分数是它在它所在的排序集中的分数的总和; 因为交集要求元素是每个给定有序集合的成员, 所以结果有序集合中每个元素的分数等于输入排序集的数量
@@ -202,6 +212,7 @@ func (c *Client) ZInter(keys []string, weights []float64, op string, withScore b
 }
 
 // ZInterStore v2.0.0后可用
+// 命令格式: ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX]
 // 时间复杂度: O(NK)+O(Mlog(M)), N为最小有序集合的基数, K为指定的有序集合数, M为结果集合中的元素数量
 // 计算有序集合的交集, 并将结果存储在目标中
 // 默认情况下, 一个元素的结果分数是它在它所在的排序集中的分数的总和; 因为交集要求元素是每个给定有序集合的成员, 所以结果有序集合中每个元素的分数等于输入排序集的数量
@@ -232,6 +243,7 @@ func (c *Client) ZInterStore(dst string, keys []string, weights []float64, op st
 }
 
 // ZLexCount v2.8.9后可用
+// 命令格式: ZLEXCOUNT key min max
 // 时间复杂度: O(log(N)), N为有序集合中成员数量
 // 当有序集合中所有元素的分数相同时, 为了强制字典序排序, 此命令返回介于min和max之间的元素个数
 // min和max必须以(或者[开头, +和-分别表示正无穷和负无穷字符串, 所以"ZLEXCOUNT setName + -"表示返回有序集合的成员总数
@@ -243,6 +255,7 @@ func (c *Client) ZLexCount(key string, min, max string) (*Reply, error) {
 }
 
 // ZMPop v7.0.0后可用
+// 命令格式: ZMPOP numkeys key [key ...] MIN | MAX [COUNT count]
 // 时间复杂度: O(K)+O(N*log(M)), K为提供的key的数量, N为有序集合的元素总数, M为pop的元素数量
 // 从第一个非空的有序集合中pop一个或者多个元素(成员-分数对)
 // 当指定MIN参数时, 弹出的元素是第一个非空排序集中得分最低的元素; MAX参数使得分最高的元素被弹出
@@ -268,6 +281,7 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*Reply, error) {
 }
 
 // ZMScore v6.2.0后可用
+// 命令格式: ZMSCORE key member [member ...]
 // 时间复杂度: O(N), N为members的数量
 // 获取有序集合key中指定成员的分数
 // 对于每个不存在的成员, 返回nil
@@ -280,6 +294,7 @@ func (c *Client) ZMScore(key string, members ...interface{}) (*Reply, error) {
 }
 
 // ZPopMax v5.0.0后可用
+// 命令格式: ZPOPMAX key [count]
 // 时间复杂度: O(log(N)*M), N为有序集合中的元素数量, M为被pop的元素数量
 // 从指定的有序集合中移除并且返回count个分数最高的成员
 // 如果没有指定count, count默认值为1; 如果count值大于有序集合的基数将不会产生错误, 当返回多个元素时, 将会根据分数由高到低的pop
@@ -294,6 +309,7 @@ func (c *Client) ZPopMax(key string, count int64) (*Reply, error) {
 }
 
 // ZPopMin v5.0.0后可用
+// 命令格式: ZPOPMIN key [count]
 // 时间复杂度: O(log(N)*M), N为有序集合中的元素数量, M为被pop的元素数量
 // 与ZPOPMAX相似, 不同之处在于ZPOPMIN返回的是分数由低到高的count个元素
 // 返回值类型: Array, 返回成员和分数的数组
@@ -307,6 +323,7 @@ func (c *Client) ZPopMin(key string, count int64) (*Reply, error) {
 }
 
 // ZRandMember v6.2.0后可用
+// 命令格式: ZRANDMEMBER key [ count [WITHSCORES]]
 // 时间复杂度: O(N), N为返回的元素数量
 // 如果不指定count和WITHSCORES参数, 将从有序集合中随机返回一个元素
 // count > 0: 返回去重后的元素数组, 数组长度为count和集合基数的最小值
@@ -328,7 +345,7 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) (*Reply, e
 }
 
 // ZRange v1.2.0后可用
-// ZRANGE key min max [ BYSCORE | BYLEX] [REV] [LIMIT offset count] [WITHSCORES]
+// 命令格式: ZRANGE key min max [ BYSCORE | BYLEX] [REV] [LIMIT offset count] [WITHSCORES]
 // v6.2.0开始支持REV、BYSCORE、BYLEX、LIMIT参数
 // 时间复杂度: O(log(N)+M), N为有序集合的元素数量, M为返回的元素个数
 // 返回指定有序集合中指定范围内的元素
@@ -381,7 +398,7 @@ func (c *Client) ZRange(key string, min, max interface{}, by string, rev, withSc
 }
 
 // ZRangeByLex v2.8.9后可用, v6.2.0后废弃
-// ZRANGEBYLEX key min max [LIMIT offset count]
+// 命令格式: ZRANGEBYLEX key min max [LIMIT offset count]
 // v2.0.0开始支持WITHSCORES参数
 // 时间复杂度: O(log(N)+M) N为有序集合的元素数量, M为返回的元素个数
 // 如果有序集合中所有的成员分数相同, 此命令按照字典序返回min和max之间的元素
@@ -397,7 +414,7 @@ func (c *Client) ZRangeByLex(key, min, max string, offset, count int64) (*Reply,
 }
 
 // ZRangeByScore v1.0.5后可用, v6.2.0开始废弃
-// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+// 命令格式: ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 // 时间复杂度: O(log(N)+M), N为有序集合中的元素数量, M为返回的元素数量
 // 按照分数返回[min, max]之间的元素, 元素顺序为由低到高, 如果指定了WITHSCORES参数, 同时将返回每个元素的分数
 // min和max可以是-inf和+inf, 分别表示负无穷和正无穷
@@ -416,7 +433,7 @@ func (c *Client) ZRangeByScore(key string, min, max interface{}, withScore bool,
 }
 
 // ZRangeStore v6.2.0后可用
-// ZRANGESTORE dst src min max [ BYSCORE | BYLEX] [REV] [LIMIT offset count]
+// 命令格式: ZRANGESTORE dst src min max [ BYSCORE | BYLEX] [REV] [LIMIT offset count]
 // 时间复杂度: O(log(N)+M), N为有序集合中的元素数量, M为存储在dst中的元素数量
 // 与ZRANGE相似, 不同之处在于ZRANGESTORE将结果集合存储在dst中
 // 返回值类型: Integer, 返回结果有序集合中的元素数量
@@ -442,7 +459,7 @@ func (c *Client) ZRangeStore(dst, src string, min, max interface{}, by string, r
 }
 
 // ZRank v2.0.0后可用
-// ZRANK key member
+// 命令格式: ZRANK key member
 // 时间复杂度: O(log(N))
 // 返回存储在key的有序集合中成员的排名, 分数从低到高排序; 排名(或索引)从0开始, 这意味着得分最低的成员排名为0
 // 返回值类型:
@@ -456,7 +473,7 @@ func (c *Client) ZRank(key string, member interface{}) (*Reply, error) {
 }
 
 // ZRem v1.2.0后可用
-// ZREM key member [member ...]
+// 命令格式: ZREM key member [member ...]
 // v2.4.0开始支持多个成员参数
 // 时间复杂度: O(M*log(N)), N为有序集合中元素的数量, M为需要被移除的元素数量
 // 从key对应的有序集合中移除指定的成员, 不存在的成员将被忽略
@@ -470,7 +487,7 @@ func (c *Client) ZRem(key string, members ...interface{}) (*Reply, error) {
 }
 
 // ZRemRangeByLex v2.8.9后可用
-// ZREMRANGEBYLEX key min max
+// 命令格式: ZREMRANGEBYLEX key min max
 // 时间复杂度: O(log(N)+M), N为有序集合中元素的数量, M为需要被删除的元素数量
 // 当有序集合中所有的元素都有相同的分数时, 为了强制字典排序, 此命令移除所有位于min和max之间的元素
 // min和max的含义与ZRANGEBYLEX命令相同; 同样, 如果使用相同的min和max参数调用ZRANGEBYLEX, 此命令实际上会删除相同的元素
@@ -483,7 +500,7 @@ func (c *Client) ZRemRangeByLex(key string, min, max string) (*Reply, error) {
 }
 
 // ZRevRank v2.0.0后可用
-// ZREVRANK key member
+// 命令格式: ZREVRANK key member
 // 时间复杂度: O(log(N))
 // 返回存储在key的有序集合中成员的排名, 分数从高到低排序; 排名(或索引)从0开始, 这意味着得分最高的成员排名为0
 // 返回值类型:
@@ -497,7 +514,7 @@ func (c *Client) ZRevRank(key string, member interface{}) (*Reply, error) {
 }
 
 // ZScan v2.8.0后可用
-// ZSCAN key cursor [MATCH pattern] [COUNT count]
+// 命令格式: ZSCAN key cursor [MATCH pattern] [COUNT count]
 // 时间复杂度: O(N), N为集合中的元素数量
 // 迭代集合中的元素
 // 返回值类型: Array, 数组元素包含两个元素, 成员及其分数
@@ -515,7 +532,7 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*
 }
 
 // ZScore v1.2.0后可用
-// ZSCORE key member
+// 命令格式: ZSCORE key member
 // 时间复杂度: O(1)
 // 获取指定有序集合中指定成员的分数
 // 如果成员不存在, 或者key不存在, 返回nil
@@ -528,7 +545,7 @@ func (c *Client) ZScore(key string, member interface{}) (*Reply, error) {
 }
 
 // ZUnion v6.2.0后可用
-// ZUNION numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX] [WITHSCORES]
+// 命令格式: ZUNION numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX] [WITHSCORES]
 // 时间复杂度: O(N)+O(M*log(M)), N为指定有序集合的所有成员总数, M为结果有序集合中的元素数量
 // 计算指定有序集合的并集
 // 默认情况下, 一个元素的结果分数是它在它所在的排序集中的分数的总和
@@ -561,7 +578,7 @@ func (c *Client) ZUnion(keys []string, weights []float64, op string, withScore b
 }
 
 // ZUnionStore v2.0.0后可用
-// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX]
+// 命令格式: ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM | MIN | MAX]
 // 时间复杂度: O(N)+O(M*log(M)), N为指定有序集合的所有成员总数, M为结果有序集合中的元素数量
 // 计算指定有序集合的并集, 并将结果存储进dst
 // 返回值类型: Integer, 返回存储进dst中的元素数量

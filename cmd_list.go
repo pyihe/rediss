@@ -3,6 +3,7 @@ package rediss
 import "github.com/pyihe/go-pkg/maths"
 
 // BLMove v6.2.0后可用
+// 命令格式: BLMOVE source destination LEFT | RIGHT LEFT | RIGHT timeout
 // 时间复杂度: O(1)
 // 当source有元素时, BLMOVE与LMOVE一样
 // 如果source没有元素时, BLMOVE将会阻塞直到有另一个客户端push元素到source中或者直到超时
@@ -21,6 +22,7 @@ func (c *Client) BLMove(src, dst, fromTo string, timeout float64) (*Reply, error
 }
 
 // BLMPop v7.0.0后可用
+// 命令格式: BLMPOP timeout numkeys key [key ...] LEFT | RIGHT [COUNT count]
 // 时间复杂度: O(N+M), N为key的数量, M为返回的元素数量
 // 当任意一个key对应的list有元素时, BLMPOP与LMPOP一样
 // 当所有的list为空时, redis将会阻塞该连接, 直到有另一个客户端push元素到list中
@@ -46,6 +48,7 @@ func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64
 }
 
 // BLPop v2.0.0后可用
+// 命令格式: BLPOP key [key ...] timeout
 // 时间复杂度: O(N), N为提供的key的数量
 // BLPOP是阻塞式的, 当给定的key对应的所有list没有元素可以pop时, redis将阻塞连接
 // 返回值类型:
@@ -63,6 +66,7 @@ func (c *Client) BLPop(keys []string, timeout float64) (*Reply, error) {
 }
 
 // BRPop v2.0.0后可用
+// 命令格式: BRPOP key [key ...] timeout
 // 时间复杂度: O(N), N为提供的key的数量
 // RLPOP是阻塞式的, 当给定的key对应的所有list没有元素可以pop时, redis将阻塞连接
 // 返回值类型:
@@ -79,6 +83,7 @@ func (c *Client) BRPop(keys []string, timeout float64) (*Reply, error) {
 }
 
 // BRPopLPush v2.2.0后可用, v6.2.0后废弃
+// 命令格式: BRPOPLPUSH source destination timeout
 // 时间复杂度: O(1)
 // 当src为空时, redis将会阻塞连接, 直到有元素被push或者timeout超时, 0值的timeout将会永久阻塞
 // 从v6.0.0开始, timeout从整型变为双精度浮点型
@@ -95,6 +100,7 @@ func (c *Client) BRPopLPush(src, dst string, timeout float64) (*Reply, error) {
 }
 
 // LIndex v1.0.0后可用
+// 命令格式: LINDEX key index
 // 时间复杂度: O(N), N为需要遍历的元素数量, 这使得请求第一个或者最后一个元素时的时间复杂度为O(1)
 // 返回key对应list中指定位置的元素, 索引从0开始, 负数表示从list尾部开始, -1表示最后一个元素
 // 如果key对应的值类型不是list, 将会返回一个错误
@@ -110,6 +116,7 @@ func (c *Client) LIndex(key string, index int64) (*Reply, error) {
 }
 
 // LInsert v2.2.0后可用
+// 命令格式: LINSERT key BEFORE | AFTER pivot element
 // 时间复杂度: O(N), N为找到基准值之前需要遍历的元素个数
 // 在指定list的基准值之前或者之后插入元素, 如果key不存在, 视为空list并且没有操作执行
 // 如果key存在但不是list类型时, 将会返回错误
@@ -127,6 +134,7 @@ func (c *Client) LInsert(key string, to string, pivot, element interface{}) (*Re
 }
 
 // LLen v1.0.0后可用
+// 命令格式: LLEN key
 // 时间复杂度: O(1)
 // 返回指定队列的长度, 如果队列不存在, 被认为是空队列并且返回0, 如果key数据类型不是队列, 将会返回错误
 // 返回值类型: Integer, 返回队列的长度
@@ -137,6 +145,7 @@ func (c *Client) LLen(key string) (*Reply, error) {
 }
 
 // LMove v6.2.0后可用
+// 命令格式: LMOVE source destination LEFT | RIGHT LEFT | RIGHT
 // 时间复杂度: O(1)
 // 自动返回并且移除src的头部元素或者尾部元素(取决于from参数)
 // 然后将元素push进dst队列的头部或者尾部(取决于from参数)
@@ -152,6 +161,7 @@ func (c *Client) LMove(src, dst, fromTo string) (*Reply, error) {
 }
 
 // LMPop v7.0.0后可用
+// 命令格式: LMPOP numkeys key [key ...] LEFT | RIGHT [COUNT count]
 // 时间复杂度: O(N+M), N为提供的key的数量, M是返回的元素数量
 // 从提供的keys中第一个非空list pop一个或者多个元素
 // LPOP和RPOP只作用于一个key, 但是可以返回多个元素
@@ -176,6 +186,7 @@ func (c *Client) LMPop(keys []string, from string, count int64) (*Reply, error) 
 }
 
 // LPop v1.0.0后可用
+// 命令格式: LPOP key [count]
 // 时间复杂度: O(N), N为返回的元素个数
 // 移除并返回key对应队列的第一个元素
 // 命令默认pop队列头部的第一个元素, 当提供了可选的count参数后, redis回复将由count个元素组成, 取决于队列的长度
@@ -193,6 +204,7 @@ func (c *Client) LPop(key string, count int64) (*Reply, error) {
 }
 
 // LPos v6.0.6后可用
+// 命令格式: LPOS key element [RANK rank] [COUNT num-matches] [MAXLEN len]
 // 时间复杂度: O(N), N为list拥有的元素数量
 // 命令返回匹配到指定队列指定元素的位置, 位置从0开始
 // 如果没有选项被指定, 命令将会从头到尾扫描队列, 寻找第一个匹配的元素, 如果元素被找到, 返回位置索引, 如果没有匹配到, 则返回nil
@@ -224,6 +236,7 @@ func (c *Client) LPos(key string, element interface{}, rank, count, maxLen int64
 }
 
 // LPush v1.0.0后可用
+// 命令格式: LPUSH key element [element ...]
 // 时间复杂度: O(N), N为元素的数量
 // 向key指定的队列头部插入指定的元素, 如果key不存在则会先创建一个空的队列在push, 如果key存储的数据类型不是队列, 将会返回错误
 // 返回值类型:　Integer, push成功后队列的长度
@@ -236,6 +249,7 @@ func (c *Client) LPush(key string, elements ...interface{}) (*Reply, error) {
 }
 
 // LPushX v2.2.0后可用
+// 命令格式: LPUSHX key element [element ...]
 // 时间复杂度: O(N), N为push元素的数量
 // 当且仅当key存在并且key存储的是队列类型时, 向key指定的队列插入元素
 // 返回值类型: Integer, push成功后队列的长度
@@ -248,6 +262,7 @@ func (c *Client) LPushX(key string, elements ...interface{}) (*Reply, error) {
 }
 
 // LRange v1.0.0后可用
+// 命令格式: LRANGE key start stop
 // 时间复杂度: O(S+N), 对小队列来说, S为队列头到start的距离, 对于大队列来说, S为队列头或者队列尾(取决于谁的距离更近)
 // N为range指定的元素数量
 // 返回key中指定的元素, start和stop都是基于0的索引,start和stop同样可以为负数, 表示从队尾开始遍历
@@ -262,6 +277,7 @@ func (c *Client) LRange(key string, start, stop int64) (*Reply, error) {
 }
 
 // LRem v1.0.0后可用
+// 命令格式: LREM key count element
 // 时间复杂度: O(N+M), N为list的长度, M为被移除的元素数量
 // 命令将会移除list中count个element
 // count > 0: 以从头到尾的顺序移除count个element
@@ -277,6 +293,7 @@ func (c *Client) LRem(key string, count int64, element interface{}) (*Reply, err
 }
 
 // LSet v1.0.0后可用
+// 命令格式: LSET key index element
 // 时间复杂度: O(N), N为list的长度
 // 将索引为index的元素设置为element, 如果索引越界了, 将会返回错误
 // 返回值类型: Simple String
@@ -288,6 +305,7 @@ func (c *Client) LSet(key string, index int64, element interface{}) (*Reply, err
 }
 
 // LTrim v1.0.0后可用
+// 命令格式: LTRIM key start stop
 // 时间复杂度: O(N), N为需要移除的元素数量
 // 修剪指定的列表, 使其只包含指定范围的元素, start和stop都是基于0的索引, 命令执行后列表的元素为[start, stop]闭区间范围内的元素
 // start和stop同样可以为负数, 表示从列表尾部开始计算
@@ -301,6 +319,7 @@ func (c *Client) LTrim(key string, start, stop int64) (*Reply, error) {
 }
 
 // RPop v1.0.0后可用
+// 命令格式: RPOP key [count]
 // 时间复杂度: O(N), N为返回的元素个数
 // 移除并返回key对应列表的最后一个(或者count个)元素
 // 默认情况下, 命令返回列表最后一个元素, 当提供了可选的count参数后, 回复将会由count个元素组成, 取决于列表的长度
@@ -316,6 +335,7 @@ func (c *Client) RPop(key string, count int64) (*Reply, error) {
 }
 
 // RPopLPush v1.2.0后可用, v6.2.0后废弃
+// 命令格式: RPOPLPUSH source destination
 // 时间复杂度: O(1)
 // 自动返回并移除src中的尾部最后一个元素, 然后push进dst的头部
 // 如果src不存在, 将会返回nil, 没有操作被执行; 如果src和dst相同, 该操作相当于从列表中删除最后一个元素并将其作为列表的第一个元素push, 因此可以认为是列表旋转命令
@@ -327,6 +347,7 @@ func (c *Client) RPopLPush(src, dst string) (*Reply, error) {
 }
 
 // RPush v1.0.0后可用
+// 命令格式: RPUSH key element [element ...]
 // 时间复杂度: O(N), N为elements的数量
 // 将指定的元素插入进key所在的列表中, 如果key不存在, 命令将会创建一个空的列表然后再执行push操作, 如果key存储的数据类型不是list, 将会返回错误
 // 返回值类型: Integer, 返回push后列表的长度
@@ -339,6 +360,7 @@ func (c *Client) RPush(key string, elements ...interface{}) (*Reply, error) {
 }
 
 // RPushX v2.2.0后可用
+// 命令格式: RPUSHX key element [element ...]
 // 时间复杂度: O(N), N为elements的数量
 // 只有当key存在并且值类型为list时才会将elements插入进key对应的list
 // 与RPUSH相比不同的是, 当key不存在时RPUSHX不会执行任何操作
