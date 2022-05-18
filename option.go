@@ -1,6 +1,10 @@
 package rediss
 
-import "github.com/pyihe/go-pkg/serialize"
+import (
+	"time"
+
+	"github.com/pyihe/go-pkg/serialize"
+)
 
 type Option func(client *Client)
 
@@ -31,5 +35,17 @@ func WithPoolSize(size int) Option {
 func WithSerializer(serializer serialize.Serializer) Option {
 	return func(client *Client) {
 		client.serializer = serializer
+	}
+}
+
+func WithWriteTimeout(timeout time.Duration) Option {
+	return func(client *Client) {
+		client.writeTimeout = timeout
+	}
+}
+
+func WithReadTimeout(timeout time.Duration) Option {
+	return func(client *Client) {
+		client.readTimeout = timeout
 	}
 }

@@ -3,7 +3,7 @@ package rediss
 import (
 	"bufio"
 	"net"
-	"strconv"
+	"time"
 
 	innerBytes "github.com/pyihe/go-pkg/bytes"
 	"github.com/pyihe/go-pkg/errors"
@@ -23,68 +23,12 @@ func newConn(c net.Conn) *conn {
 	}
 }
 
-func (c *conn) ping() (err error) {
-	args := getArgs()
-	args.Append("PING")
-	if _, err = c.write(args.command()); err != nil {
-		goto end
-	}
-
-	if rsp, err1 := c.reply(); err != nil {
-		err = err1
-		goto end
-	} else {
-		if reply := parse(rsp); reply.GetString() != "PONG" {
-			err = errors.New("failed ping")
-			goto end
+func (c *conn) writeBytes(b []byte, timeout time.Duration) (n int, err error) {
+	if timeout > 0 {
+		if err = c.c.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+			return
 		}
 	}
-end:
-	putArgs(args)
-	return
-}
-
-func (c *conn) auth(pass string) (err error) {
-	args := getArgs()
-	args.Append("AUTH", pass)
-	if _, err = c.write(args.command()); err != nil {
-		goto end
-	}
-	if rsp, err1 := c.reply(); err != nil {
-		err = err1
-		goto end
-	} else {
-		if reply := parse(rsp); reply.GetString() != "OK" {
-			err = errors.New("failed auth")
-			goto end
-		}
-	}
-end:
-	putArgs(args)
-	return
-}
-
-func (c *conn) selectDB(db int) (err error) {
-	args := getArgs()
-	args.Append("SELECT", strconv.FormatInt(int64(db), 10))
-	if _, err = c.write(args.command()); err != nil {
-		goto end
-	}
-	if rsp, err1 := c.reply(); err != nil {
-		err = err1
-		goto end
-	} else {
-		if reply := parse(rsp); reply.GetString() != "OK" {
-			err = errors.New("failed select database")
-			goto end
-		}
-	}
-end:
-	putArgs(args)
-	return
-}
-
-func (c *conn) write(b []byte) (n int, err error) {
 	n, err = c.writer.Write(b)
 	if err != nil {
 		return
@@ -93,8 +37,34 @@ func (c *conn) write(b []byte) (n int, err error) {
 	return
 }
 
-func (c *conn) reply() (interface{}, error) {
-	var head, err = c.readLine()
+func (c *conn) writeCommand(args *Args, writeTimeout, readTimeout time.Duration) (reply *Reply, err error) {
+	var response interface{}
+	if args == nil {
+		goto end
+	}
+	if _, err = c.writeBytes(args.command(), writeTimeout); err != nil {
+		goto end
+	}
+
+	response, err = c.reply(readTimeout)
+	if err != nil {
+		goto end
+	}
+
+	reply = parse(response)
+
+end:
+	putArgs(args)
+	return
+}
+
+func (c *conn) reply(timeout time.Duration) (interface{}, error) {
+	if timeout > 0 {
+		if err := c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+	}
+	var head, err = c.readLine(timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -113,13 +83,13 @@ func (c *conn) reply() (interface{}, error) {
 	case '-':
 		return newReply(nil, innerBytes.String(head[1:])), nil
 	case '$':
-		bulkString, err := c.readBulkString(head)
+		bulkString, err := c.readBulkString(head, timeout)
 		if err != nil {
 			return nil, err
 		}
 		return newReply(bulkString), nil
 	case '*':
-		array, err := c.readArray(head)
+		array, err := c.readArray(head, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +99,12 @@ func (c *conn) reply() (interface{}, error) {
 	}
 }
 
-func (c *conn) readLine() (line []byte, err error) {
+func (c *conn) readLine(timeout time.Duration) (line []byte, err error) {
+	if timeout > 0 {
+		if err = c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return
+		}
+	}
 	line, err = c.reader.ReadSlice('\n')
 	if err == bufio.ErrBufferFull {
 		buf := append([]byte{}, line...)
@@ -151,7 +126,7 @@ func (c *conn) readLine() (line []byte, err error) {
 	return
 }
 
-func (c *conn) readBulkString(head []byte) ([]byte, error) {
+func (c *conn) readBulkString(head []byte, timeout time.Duration) ([]byte, error) {
 	count, err := dataLen(head[1:])
 	if err != nil {
 		return nil, err
@@ -160,13 +135,18 @@ func (c *conn) readBulkString(head []byte) ([]byte, error) {
 		return nil, nil
 	}
 	buf := make([]byte, count+2)
+	if timeout > 0 {
+		if err = c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+	}
 	if _, err = c.reader.Read(buf); err != nil {
 		return nil, err
 	}
 	return buf[:count], nil
 }
 
-func (c *conn) readArray(head []byte) (interface{}, error) {
+func (c *conn) readArray(head []byte, timeout time.Duration) (interface{}, error) {
 	var count, err = dataLen(head[1:])
 	if err != nil {
 		return nil, err
@@ -177,7 +157,7 @@ func (c *conn) readArray(head []byte) (interface{}, error) {
 
 	var array = make([]interface{}, count)
 	for i := 0; i < count; i++ {
-		array[i], err = c.reply()
+		array[i], err = c.reply(timeout)
 		if err != nil {
 			return nil, err
 		}
