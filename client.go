@@ -37,6 +37,13 @@ func New(opts ...Option) *Client {
 	return c
 }
 
+func (c *Client) RunCommand(cmd string, args ...interface{}) (*Reply, error) {
+	cmdArgs := getArgs()
+	cmdArgs.Append(cmd)
+	cmdArgs.AppendArgs(args...)
+	return c.sendCommand(cmdArgs)
+}
+
 func (c *Client) sendCommand(args *Args) (result *Reply, err error) {
 	conn, newConn, err := c.popConn()
 	if err != nil {
@@ -48,7 +55,7 @@ func (c *Client) sendCommand(args *Args) (result *Reply, err error) {
 
 	// 回收Args
 	putArgs(args)
-	result, err = c.reply(conn)
+	result, err = c.readReply(conn)
 
 end:
 	if !newConn || (newConn && conn != nil) {
@@ -57,7 +64,7 @@ end:
 	return
 }
 
-func (c *Client) reply(conn *conn) (result *Reply, err error) {
+func (c *Client) readReply(conn *conn) (result *Reply, err error) {
 	r, err := conn.reply()
 	if err != nil {
 		return nil, err
