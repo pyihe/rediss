@@ -82,6 +82,8 @@ func (c *Client) GetEx(key string, op string, opValue int64) (*Reply, error) {
 		args.AppendArgs(op, opValue)
 	case "PERSIST":
 		args.Append(op)
+	case "":
+		break
 	default:
 		return nil, ErrInvalidArgumentFormat
 	}
@@ -273,6 +275,8 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 	switch strings.ToUpper(op) {
 	case "NX", "XX":
 		args.Append(op)
+	case "":
+		break
 	default:
 		return nil, ErrInvalidArgumentFormat
 	}
@@ -284,6 +288,8 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 		args.AppendArgs(expireOp, expireValue)
 	case "KEEPTTL":
 		args.Append("KEEPTTL")
+	case "":
+		break
 	default:
 		return nil, ErrInvalidArgumentFormat
 	}
@@ -297,7 +303,7 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 // 返回值类型: Simple String
 func (c *Client) SetEX(key string, value interface{}, sec int64) (*Reply, error) {
 	args := getArgs()
-	args.AppendArgs("SETEX", key, value, sec)
+	args.AppendArgs("SETEX", key, sec, value)
 	return c.sendCommand(args)
 }
 
