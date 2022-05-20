@@ -55,3 +55,24 @@ func parse(reply interface{}) (result *Reply) {
 	}
 	return
 }
+
+func appendArgs(args *Args, arg interface{}) (err error) {
+	switch data := arg.(type) {
+	case []string:
+		args.Append(data...)
+	case []interface{}:
+		args.AppendArgs(data...)
+	case map[string]interface{}:
+		for k, v := range data {
+			args.Append(k)
+			args.AppendArgs(v)
+		}
+	case map[string]string:
+		for k, v := range data {
+			args.Append(k, v)
+		}
+	default:
+		err = ErrNotSupportArgument
+	}
+	return
+}

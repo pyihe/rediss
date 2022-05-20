@@ -22,6 +22,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if count > 1 {
@@ -93,6 +94,7 @@ func (c *Client) ZAdd(key string, xOp string, tOp string, ch, incr bool, scoreMe
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	switch strings.ToUpper(tOp) {
@@ -101,6 +103,7 @@ func (c *Client) ZAdd(key string, xOp string, tOp string, ch, incr bool, scoreMe
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if ch {
@@ -203,6 +206,7 @@ func (c *Client) ZInter(keys []string, weights []float64, op string, withScore b
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if withScore {
@@ -237,6 +241,7 @@ func (c *Client) ZInterStore(dst string, keys []string, weights []float64, op st
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)
@@ -272,6 +277,7 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*Reply, error) {
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if count > 1 {
@@ -383,6 +389,7 @@ func (c *Client) ZRange(key string, min, max interface{}, by string, rev, withSc
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if rev {
@@ -447,6 +454,7 @@ func (c *Client) ZRangeStore(dst, src string, min, max interface{}, by string, r
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if rev {
@@ -569,6 +577,7 @@ func (c *Client) ZUnion(keys []string, weights []float64, op string, withScore b
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if withScore {
@@ -599,6 +608,7 @@ func (c *Client) ZUnionStore(dst string, keys []string, weights []float64, op st
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)

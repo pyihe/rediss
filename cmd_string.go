@@ -85,6 +85,7 @@ func (c *Client) GetEx(key string, op string, opValue int64) (*Reply, error) {
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)
@@ -210,28 +211,36 @@ func (c *Client) MGet(keys ...string) (*Reply, error) {
 // MSET命令是原子操作, 所以将不会存在一些key设置成功, 而一些key确设置失败
 // 返回值类型: Simple String, 总是OK, 因为MSET不会失败
 func (c *Client) MSet(kvs ...interface{}) (*Reply, error) {
-	if n := len(kvs); n == 0 || n%2 != 0 {
-		return nil, ErrInvalidArgumentFormat
-	}
 	args := getArgs()
 	args.Append("MSET")
-	args.AppendArgs(kvs...)
+	if len(kvs) == 1 {
+		if err := appendArgs(args, kvs[0]); err != nil {
+			putArgs(args)
+			return nil, err
+		}
+	} else {
+		args.AppendArgs(kvs...)
+	}
 	return c.sendCommand(args)
 }
 
-// MSetNX v1.0.1后也用
+// MSetNX v1.0.1后可用
 // 命令格式: MSETNX key value [ key value ...]
 // 时间复杂度: O(N), N为需要设置的key的数量
 // 与MSET不同的是, 执行MSETNX时只要一个key存在, 则命令不会执行任何操作, 即MSETNX成功的前提是需要设置的key全部都不存在
 // 同样MSETNX也是原子操作
 // 返回值类型: Integer, 如果所有key都被设置成功返回1; 否则返回0
 func (c *Client) MSetNX(kvs ...interface{}) (*Reply, error) {
-	if n := len(kvs); n == 0 || n%2 != 0 {
-		return nil, ErrInvalidArgumentFormat
-	}
 	args := getArgs()
 	args.Append("MSETNX")
-	args.AppendArgs(kvs...)
+	if len(kvs) == 1 {
+		if err := appendArgs(args, kvs[0]); err != nil {
+			putArgs(args)
+			return nil, err
+		}
+	} else {
+		args.AppendArgs(kvs...)
+	}
 	return c.sendCommand(args)
 }
 
@@ -278,6 +287,7 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if get {
@@ -291,6 +301,7 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)

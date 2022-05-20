@@ -325,6 +325,7 @@ func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 
@@ -354,6 +355,7 @@ func (c *Client) ExpireAt(key string, unix int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)
@@ -394,6 +396,7 @@ func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)
@@ -421,6 +424,7 @@ func (c *Client) PExpireAt(key string, millUnix int64, op string) (*Reply, error
 	case "":
 		break
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	return c.sendCommand(args)

@@ -20,6 +20,11 @@ func (c *Client) BitCount(key string, start, end int64, unit string) (*Reply, er
 		switch strings.ToUpper(unit) {
 		case "BYTE", "BIT":
 			args.Append(unit)
+		case "":
+			break
+		default:
+			putArgs(args)
+			return nil, ErrInvalidArgumentFormat
 		}
 	}
 	return c.sendCommand(args)
@@ -55,6 +60,7 @@ func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 	case "AND", "OR", "XOR", "NOT":
 		args.Append(op, dst)
 	default:
+		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	args.Append(keys...)
@@ -91,6 +97,7 @@ func (c *Client) BitPos(key string, bit int64, start, end int64, unit string) (*
 			case "":
 				break
 			default:
+				putArgs(args)
 				return nil, ErrInvalidArgumentFormat
 			}
 		}
