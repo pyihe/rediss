@@ -1,6 +1,8 @@
 package rediss
 
 import (
+	"strconv"
+
 	"github.com/pyihe/go-pkg/bytes"
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/go-pkg/serialize"
@@ -45,6 +47,10 @@ func (r *Reply) GetInteger() (v int64, err error) {
 		v, err = bytes.Int64(r.value)
 	}
 	return
+}
+
+func (r *Reply) GetFloat() (v float64, err error) {
+	return strconv.ParseFloat(bytes.String(r.value), 64)
 }
 
 func (r *Reply) Error() (err error) {

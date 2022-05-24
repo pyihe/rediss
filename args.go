@@ -11,6 +11,13 @@ import (
 
 type Args []string
 
+func (a *Args) String() string {
+	if a == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", *a)
+}
+
 func (a *Args) Append(arg ...string) {
 	*a = append(*a, arg...)
 }

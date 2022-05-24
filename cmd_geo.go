@@ -4,55 +4,8 @@ import (
 	"strings"
 
 	"github.com/pyihe/go-pkg/errors"
+	"github.com/pyihe/rediss/geo"
 )
-
-// GeoLocation 地理空间信息
-type GeoLocation struct {
-	Longitude float64 // 经度
-	Latitude  float64 // 纬度
-	Name      string  // 地理名
-}
-
-// GeoRadiusOption GEORADIUS命令的查询选项
-type GeoRadiusOption struct {
-	Radius    float64 // 半径
-	Unit      string  // 单位: M(米), KM(公里), FT(英尺), MI(英里)
-	WithCoord bool    // 同时返回经纬度坐标
-	WithDist  bool    // 同时返回离圆点的距离
-	WithHash  bool    // 同时返回GEOHASH编码
-	Any       bool    // 是否指定COUNT中的any参数
-	Count     int64   // count参数
-	Sort      string  // 排序方式
-	Store     string  //
-	StoreDist string  //
-}
-
-// GeoSearchOption GEOSEARCH选项
-type GeoSearchOption struct {
-	// 以成员为中心
-	Member string // 以member为中心时的member名称
-
-	// 以指定的经纬度为中心
-	Longitude float64 // 经度
-	Latitude  float64 // 纬度
-
-	// 扫描圆形区域的半径
-	Radius     float64 // 查询半径
-	RadiusUnit string  // 圆形范围单位: M(米), KM(公里), FT(英尺), MI(英里)
-
-	// 扫描矩形区域
-	Width   float64 // 矩形宽度
-	Height  float64 // 矩形高度
-	BoxUnit string  // 矩形范围的单位: M(米), KM(公里), FT(英尺), MI(英里)
-
-	Sort      string // 排序方式
-	Count     int64  // COUNT参数
-	Any       bool   //
-	WithCoord bool   // 同时返回经纬度坐标
-	WithDist  bool   // 同时返回离圆点的距离
-	WithHash  bool   // 同时返回GEOHASH编码
-	StoreDist string //
-}
 
 // GeoAdd v3.2.0后可用
 // 命令格式: GEOADD key [ NX | XX] [CH] longitude latitude member [ longitude latitude member ...]
@@ -71,7 +24,10 @@ type GeoSearchOption struct {
 // 返回值类型: Integer
 // 如果没有指定可选参数, 返回添加的新元素数量
 // 如果指定了CH选项, 返回添加或者更新的元素数量
-func (c *Client) GeoAdd(key, op string, members ...*GeoLocation) (*Reply, error) {
+func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error) {
+	if len(members) == 0 {
+		return nil, errors.New("GEOADD need pass member arguments at least one")
+	}
 	args := getArgs()
 	args.Append("GEOADD", key)
 	switch strings.ToUpper(op) {
@@ -123,7 +79,7 @@ func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Rep
 // 返回值类型: Array
 func (c *Client) GeoHash(key string, members ...string) (*Reply, error) {
 	args := getArgs()
-	args.Append(key)
+	args.Append("GEOHASH", key)
 	args.Append(members...)
 	return c.sendCommand(args)
 }
@@ -133,11 +89,41 @@ func (c *Client) GeoHash(key string, members ...string) (*Reply, error) {
 // 时间复杂度: O(N), N为请求的member数量
 // 返回指定成员的经纬度
 // 返回值类型: Array, 不存在的元素返回值将会是nil
-func (c *Client) GeoPos(key string, members ...string) (*Reply, error) {
-	args := getArgs()
+func (c *Client) GeoPos(key string, members ...string) ([]*geo.Location, error) {
+	// 组装参数
+	var args = getArgs()
+	defer putArgs(args)
+
 	args.Append("GEOPOS", key)
 	args.Append(members...)
-	return c.sendCommand(args)
+
+	// 获取回复
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		putArgs(args)
+		return nil, err
+	}
+
+	// 组装回复
+	result := make([]*geo.Location, len(members))
+	for i, arr := range reply.GetArray() {
+		switch {
+		case arr == nil:
+			result[i] = nil
+		default:
+			subArr := arr.GetArray()
+			result[i] = &geo.Location{
+				Name: members[i],
+			}
+			if result[i].Longitude, err = subArr[0].GetFloat(); err != nil {
+				return nil, err
+			}
+			if result[i].Latitude, err = subArr[1].GetFloat(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return result, nil
 }
 
 // GeoRadiusRo v3.2.10后可用, v6.2.0后被视为废弃
@@ -145,18 +131,22 @@ func (c *Client) GeoPos(key string, members ...string) (*Reply, error) {
 // v6.2.0开始支持ANY选项
 // 时间复杂度: O(N+log(M))其中N是由中心和半径分隔的圆形区域的边界框内的元素数, M是索引内的项目数
 // GEORADIUS的只读变种
-func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *GeoRadiusOption) (*Reply, error) {
+func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *geo.RadiusOption) ([]*geo.Location, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
+
 	args := getArgs()
+	defer putArgs(args)
+
 	args.Append("GEORADIUS_RO", key)
 	args.AppendArgs(longitude, latitude)
 	args.AppendArgs(option.Radius)
+
 	if option.StoreDist != "" || option.Store != "" {
-		putArgs(args)
 		return nil, errors.New("GEORADIUS_RO not support STORE or STOREDIST arguments")
 	}
+
 	if option.Unit != "" {
 		args.Append(option.Unit)
 	}
@@ -179,7 +169,12 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *Ge
 	if option.Sort != "" {
 		args.Append(option.Sort)
 	}
-	return c.sendCommand(args)
+
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		return nil, err
+	}
+	return readLocation(reply, option), nil
 }
 
 // GeoRadius v3.2.0后可用, v6.2.0开始被视为废弃
@@ -209,9 +204,12 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *Ge
 // 返回值类型: Array
 // 没有指定任何WITH选项, 命令只返回一个线性数组
 // 如果指定了WITHCOORD, WITHDIST或者WITHHASH选项, 命令返回由数组组成的数组, 每个子数组元素代表一个返回项
-func (c *Client) GeoRadius(key string, longitude, latitude float64, option *GeoRadiusOption) (*Reply, error) {
+func (c *Client) GeoRadius(key string, longitude, latitude float64, option *geo.RadiusOption) ([]*geo.Location, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
+	}
+	if option.Store != "" || option.StoreDist != "" {
+		return nil, errors.New("GeoRadius not support STORE or STOREDIST arguments")
 	}
 	args := getArgs()
 	args.Append("GEORADIUS", key)
@@ -245,19 +243,25 @@ func (c *Client) GeoRadius(key string, longitude, latitude float64, option *GeoR
 	if option.StoreDist != "" {
 		args.Append("STOREDIST", option.StoreDist)
 	}
-	return c.sendCommand(args)
+
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		return nil, err
+	}
+
+	return readLocation(reply, option), nil
 }
 
-// GeoRadiusByMember v3.2.0后可用, v6.2.0开始被视为废弃
-// 命令格式: GEORADIUSBYMEMBER key member radius M | KM | FT | MI [WITHCOORD] [WITHDIST] [WITHHASH] [ COUNT count [ANY]] [ ASC | DESC] [STORE key] [STOREDIST key]
-// 时间复杂度: O(N+log(M))其中N是由中心和半径分隔的圆形区域的边界框内的元素数, M是索引内的项目数
-// 此命令与 GEORADIUS 完全一样, 唯一的区别是, 它不是将经度和纬度值作为要查询的区域的中心, 而是采用排序集表示的地理空间索引中已经存在的成员的名称
-func (c *Client) GeoRadiusByMember(key, member string, option *GeoRadiusOption) (*Reply, error) {
+func (c *Client) GeoRadiusStore(key string, longitude, latitude float64, option *geo.RadiusOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
+	if option.Store == "" && option.StoreDist == "" {
+		return nil, errors.New("GeoRadiusStore need STORE or STOREDIST arguments")
+	}
 	args := getArgs()
-	args.Append("GEORADIUSBYMEMBER", key, member)
+	args.Append("GEORADIUS", key)
+	args.AppendArgs(longitude, latitude)
 	args.AppendArgs(option.Radius)
 	if option.Unit != "" {
 		args.Append(option.Unit)
@@ -287,24 +291,64 @@ func (c *Client) GeoRadiusByMember(key, member string, option *GeoRadiusOption) 
 	if option.StoreDist != "" {
 		args.Append("STOREDIST", option.StoreDist)
 	}
+
 	return c.sendCommand(args)
 }
 
-// GeoRadiusByMemberRo v3.2.10和4.0.0后可用
-// 命令格式: GEORADIUSBYMEMBER key member radius M | KM | FT | MI [WITHCOORD] [WITHDIST] [WITHHASH] [ COUNT count [ANY]] [ ASC | DESC]
+// GeoRadiusByMember v3.2.0后可用, v6.2.0开始被视为废弃
+// 命令格式: GEORADIUSBYMEMBER key member radius M | KM | FT | MI [WITHCOORD] [WITHDIST] [WITHHASH] [ COUNT count [ANY]] [ ASC | DESC] [STORE key] [STOREDIST key]
 // 时间复杂度: O(N+log(M))其中N是由中心和半径分隔的圆形区域的边界框内的元素数, M是索引内的项目数
-// 此命令与为GEORADIUSBYMEMBER的只读版本
-func (c *Client) GeoRadiusByMemberRo(key, member string, option *GeoRadiusOption) (*Reply, error) {
+// 此命令与 GEORADIUS 完全一样, 唯一的区别是, 它不是将经度和纬度值作为要查询的区域的中心, 而是采用排序集表示的地理空间索引中已经存在的成员的名称
+func (c *Client) GeoRadiusByMember(key, member string, option *geo.RadiusOption) ([]*geo.Location, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
-	args := getArgs()
-	args.Append("GEORADIUSBYMEMBER_RO", key, member)
-	args.AppendArgs(option.Radius)
-	if option.StoreDist == "" || option.Store == "" {
-		putArgs(args)
-		return nil, errors.New("GeoRadiusByMemberRo not support STORE or STOREDIST arguments")
+	if option.Store != "" || option.StoreDist != "" {
+		return nil, errors.New("GeoRadiusByMember not support STORE or STOREDIST arguments")
 	}
+	args := getArgs()
+	args.Append("GEORADIUSBYMEMBER", key, member)
+	args.AppendArgs(option.Radius)
+	if option.Unit != "" {
+		args.Append(option.Unit)
+	}
+	if option.WithCoord {
+		args.Append("WITHCOORD")
+	}
+	if option.WithDist {
+		args.Append("WITHDIST")
+	}
+	if option.WithHash {
+		args.Append("WITHHASH")
+	}
+	if option.Count > 0 {
+		args.Append("COUNT")
+		args.AppendArgs(option.Count)
+		if option.Any {
+			args.Append("ANY")
+		}
+	}
+	if option.Sort != "" {
+		args.Append(option.Sort)
+	}
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		return nil, err
+	}
+
+	return readLocation(reply, option), nil
+}
+
+func (c *Client) GeoRadiusByMemberStore(key, member string, option *geo.RadiusOption) (*Reply, error) {
+	if option == nil {
+		return nil, ErrEmptyOptionArgument
+	}
+	if option.Store == "" && option.StoreDist == "" {
+		return nil, errors.New("GeoRadiusByMemberStore need STORE or STOREDIST arguments")
+	}
+	args := getArgs()
+	args.Append("GEORADIUSBYMEMBER", key, member)
+	args.AppendArgs(option.Radius)
 	if option.Unit != "" {
 		args.Append(option.Unit)
 	}
@@ -330,6 +374,51 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *GeoRadiusOption
 	return c.sendCommand(args)
 }
 
+// GeoRadiusByMemberRo v3.2.10和4.0.0后可用
+// 命令格式: GEORADIUSBYMEMBER key member radius M | KM | FT | MI [WITHCOORD] [WITHDIST] [WITHHASH] [ COUNT count [ANY]] [ ASC | DESC]
+// 时间复杂度: O(N+log(M))其中N是由中心和半径分隔的圆形区域的边界框内的元素数, M是索引内的项目数
+// 此命令与为GEORADIUSBYMEMBER的只读版本
+func (c *Client) GeoRadiusByMemberRo(key, member string, option *geo.RadiusOption) ([]*geo.Location, error) {
+	if option == nil {
+		return nil, ErrEmptyOptionArgument
+	}
+	args := getArgs()
+	args.Append("GEORADIUSBYMEMBER_RO", key, member)
+	args.AppendArgs(option.Radius)
+	if option.StoreDist != "" || option.Store != "" {
+		putArgs(args)
+		return nil, errors.New("GeoRadiusByMemberRo not support STORE or STOREDIST arguments")
+	}
+	if option.Unit != "" {
+		args.Append(option.Unit)
+	}
+	if option.WithCoord {
+		args.Append("WITHCOORD")
+	}
+	if option.WithDist {
+		args.Append("WITHDIST")
+	}
+	if option.WithHash {
+		args.Append("WITHHASH")
+	}
+	if option.Count > 0 {
+		args.Append("COUNT")
+		args.AppendArgs(option.Count)
+		if option.Any {
+			args.Append("ANY")
+		}
+	}
+	if option.Sort != "" {
+		args.Append(option.Sort)
+	}
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		return nil, err
+	}
+
+	return readLocation(reply, option), nil
+}
+
 // GeoSearch v6.2.0后可用
 // 命令格式: GEOSEARCH key FROMMEMBER member | FROMLONLAT longitude latitude BYRADIUS radius M | KM | FT | MI | BYBOX width height M | KM | FT | MI [ ASC | DESC] [ COUNT count [ANY]] [WITHCOORD] [WITHDIST] [WITHHASH]
 // 时间复杂度: O(N+log(M))其中N是作为过滤器提供的形状周围的网格对齐边界框区域中的元素数, M是形状内的项目数
@@ -347,7 +436,7 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *GeoRadiusOption
 // 返回值类型: Array,
 // 没有指定任何WITH选项, 命令只返回一个线性数组
 // 如果指定了WITHCOORD, WITHDIST或者WITHHASH选项, 命令返回由数组组成的数组, 每个子数组元素代表一个返回项
-func (c *Client) GeoSearch(key string, option *GeoSearchOption) (*Reply, error) {
+func (c *Client) GeoSearch(key string, option *geo.SearchOption) ([]*geo.Location, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -397,7 +486,12 @@ func (c *Client) GeoSearch(key string, option *GeoSearchOption) (*Reply, error) 
 	if option.StoreDist != "" {
 		args.Append(option.StoreDist)
 	}
-	return c.sendCommand(args)
+	reply, err := c.sendCommand(args)
+	if err != nil {
+		return nil, err
+	}
+
+	return readLocation(reply, option), nil
 }
 
 // GeoSearchStore v6.2.0后可用
@@ -407,9 +501,12 @@ func (c *Client) GeoSearch(key string, option *GeoSearchOption) (*Reply, error) 
 // 返回值类型: Array,
 // 没有指定任何WITH选项, 命令只返回一个线性数组
 // 如果指定了WITHCOORD, WITHDIST或者WITHHASH选项, 命令返回由数组组成的数组, 每个子数组元素代表一个返回项
-func (c *Client) GeoSearchStore(key string, option *GeoSearchOption) (*Reply, error) {
+func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
+	}
+	if option.StoreDist == "" {
+		return nil, errors.New("GeoSearchStore need STOREDIST argument")
 	}
 	args := getArgs()
 	args.Append("GEOSEARCHSTORE", key)
@@ -455,4 +552,68 @@ func (c *Client) GeoSearchStore(key string, option *GeoSearchOption) (*Reply, er
 		args.Append(option.StoreDist)
 	}
 	return c.sendCommand(args)
+}
+
+func readLocation(reply *Reply, option interface{}) (result []*geo.Location) {
+	array := reply.GetArray()
+	n := len(array)
+	if n == 0 {
+		return
+	}
+	var withDist, withHash, withCoord bool
+	switch opt := option.(type) {
+	case *geo.RadiusOption:
+		withDist, withHash, withCoord = opt.WithDist, opt.WithHash, opt.WithCoord
+	case *geo.SearchOption:
+		withDist, withHash, withCoord = opt.WithDist, opt.WithHash, opt.WithCoord
+	}
+
+	result = make([]*geo.Location, 0, n)
+	for _, arr := range reply.GetArray() {
+		// 如果每个点都是多元素组成的数组
+		subArr := arr.GetArray()
+		location := &geo.Location{}
+
+		switch len(subArr) {
+		case 0:
+			location.Name = arr.GetString()
+		case 1:
+		case 2:
+			location.Name = subArr[0].GetString()
+			if withDist {
+				location.Distance, _ = subArr[1].GetFloat()
+			}
+			if withHash {
+				location.GeoHash, _ = subArr[1].GetInteger()
+			}
+			if withCoord {
+				location.Longitude, _ = subArr[1].GetArray()[0].GetFloat()
+				location.Latitude, _ = subArr[1].GetArray()[1].GetFloat()
+			}
+		case 3:
+			location.Name = subArr[0].GetString()
+			if !withCoord {
+				location.Distance, _ = subArr[1].GetFloat()
+				location.GeoHash, _ = subArr[2].GetInteger()
+			}
+			if !withHash {
+				location.Distance, _ = subArr[1].GetFloat()
+				location.Longitude, _ = subArr[2].GetArray()[0].GetFloat()
+				location.Latitude, _ = subArr[2].GetArray()[1].GetFloat()
+			}
+			if !withDist {
+				location.GeoHash, _ = subArr[1].GetInteger()
+				location.Longitude, _ = subArr[2].GetArray()[0].GetFloat()
+				location.Latitude, _ = subArr[2].GetArray()[1].GetFloat()
+			}
+		case 4:
+			location.Name = subArr[0].GetString()
+			location.Distance, _ = subArr[1].GetFloat()
+			location.GeoHash, _ = subArr[2].GetInteger()
+			location.Longitude, _ = subArr[3].GetArray()[0].GetFloat()
+			location.Latitude, _ = subArr[3].GetArray()[1].GetFloat()
+		}
+		result = append(result, location)
+	}
+	return
 }
