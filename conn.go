@@ -37,24 +37,17 @@ func (c *conn) writeBytes(b []byte, timeout time.Duration) (n int, err error) {
 	return
 }
 
-func (c *conn) writeCommand(args *Args, writeTimeout, readTimeout time.Duration) (reply *Reply, err error) {
-	var response interface{}
-	if args == nil {
-		goto end
-	}
-	if _, err = c.writeBytes(args.command(), writeTimeout); err != nil {
-		goto end
+func (c *conn) writeCommand(cmd []byte, writeTimeout, readTimeout time.Duration) (reply *Reply, err error) {
+	if _, err = c.writeBytes(cmd, writeTimeout); err != nil {
+		return
 	}
 
-	response, err = c.reply(readTimeout)
+	response, err := c.reply(readTimeout)
 	if err != nil {
-		goto end
+		return
 	}
 
 	reply = parse(response)
-
-end:
-	putArgs(args)
 	return
 }
 

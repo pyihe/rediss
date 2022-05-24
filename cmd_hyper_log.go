@@ -1,5 +1,7 @@
 package rediss
 
+import "github.com/pyihe/rediss/args"
+
 // PFAdd v2.8.9后可用
 // 命令格式: PFADD key [element [element ...]]
 // 时间复杂度: O(1)添加每个元素
@@ -10,10 +12,12 @@ package rediss
 // 调用不带元素但仅变量名有效的命令, 如果变量已存在则不执行任何操作, 或者如果键不存在则仅创建数据结构(在后一种情况下返回1)
 // 返回值类型: Integer
 func (c *Client) PFAdd(key string, elements ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("PFADD", key)
-	args.AppendArgs(elements...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("PFADD", key)
+	cmd.AppendArgs(elements...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // PFCount v2.8.9后可用
@@ -24,10 +28,12 @@ func (c *Client) PFAdd(key string, elements ...interface{}) (*Reply, error) {
 // 可以使用HyperLogLog数据结构来计算集合中的唯一元素, 只需使用少量的恒定内存, 特别是每个HyperLogLog12k字节(加上键本身的几个字节)
 // 返回值类型: Integer, 返回通过PFADD观察到的唯一元素的近似数量
 func (c *Client) PFCount(keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("PFCOUNT")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("PFCOUNT")
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // PFMerge v2.8.9后可用
@@ -37,8 +43,10 @@ func (c *Client) PFCount(keys ...string) (*Reply, error) {
 // 如果目标变量存在, 则将其视为源集之一, 其基数将包含在计算的HyperLogLog的基数中
 // 返回值类型: Simple String
 func (c *Client) PFMerge(dst string, srcs ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("PFMERGE", dst)
-	args.Append(srcs...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("PFMERGE", dst)
+	cmd.Append(srcs...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }

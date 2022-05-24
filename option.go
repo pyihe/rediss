@@ -14,6 +14,12 @@ func WithAddress(addr string) Option {
 	}
 }
 
+func WithUsername(username string) Option {
+	return func(client *Client) {
+		client.username = username
+	}
+}
+
 func WithPassword(password string) Option {
 	return func(client *Client) {
 		client.password = password

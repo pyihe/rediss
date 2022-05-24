@@ -1,4 +1,4 @@
-package rediss
+package args
 
 import (
 	"fmt"
@@ -8,6 +8,30 @@ import (
 
 	innerBytes "github.com/pyihe/go-pkg/bytes"
 )
+
+const (
+	separator  = "\r\n"
+	timeLayout = "2006-01-02 15:04:05.000000"
+)
+
+var pool sync.Pool
+
+func Get() *Args {
+	data := pool.Get()
+	if data == nil {
+		args := make(Args, 0, 16)
+		return &args
+	}
+	return data.(*Args)
+}
+
+func Put(args *Args) {
+	if args == nil {
+		return
+	}
+	args.Reset()
+	pool.Put(args)
+}
 
 type Args []string
 
@@ -69,6 +93,7 @@ func (a *Args) AppendArgs(args ...interface{}) {
 	}
 }
 
+// Bytes
 //拼接完整的命令行, redis通信协议格式为:
 //*<参数数量> CR LF
 //$<参数 1 的字节数量> CR LF
@@ -87,7 +112,7 @@ func (a *Args) AppendArgs(args ...interface{}) {
 //myValue
 //
 //实际传输值为: *3\r\n$3\r\nSET\r\n$5\r\nmyKey\r\n$7\r\nmyValue\r\n
-func (a *Args) command() (b []byte) {
+func (a *Args) Bytes() (b []byte) {
 	var buf = innerBytes.Get()
 	_, _ = buf.WriteString("*")
 	_, _ = buf.WriteString(strconv.FormatInt(int64(len(*a)), 10))
@@ -102,23 +127,4 @@ func (a *Args) command() (b []byte) {
 	b = buf.Bytes()
 	innerBytes.Put(buf)
 	return
-}
-
-var argsPool sync.Pool
-
-func getArgs() *Args {
-	data := argsPool.Get()
-	if data == nil {
-		args := make(Args, 0, 16)
-		return &args
-	}
-	return data.(*Args)
-}
-
-func putArgs(args *Args) {
-	if args == nil {
-		return
-	}
-	args.Reset()
-	argsPool.Put(args)
 }

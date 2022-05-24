@@ -1,6 +1,10 @@
 package rediss
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/pyihe/rediss/args"
+)
 
 // Append v2.0.0后可用
 // 命令格式: APPEND key value
@@ -9,9 +13,11 @@ import "strings"
 // 如果key不存在, APPEND将会创建该key并初始化为空字符串，最后将value追加到key的最后
 // 返回值类型: Integer, 返回append操作后的字符串长度
 func (c *Client) Append(key string, value interface{}) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("APPEND", key, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("APPEND", key, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // Decr v1.0.0后可用
@@ -22,9 +28,11 @@ func (c *Client) Append(key string, value interface{}) (*Reply, error) {
 // 本操作仅限于64位有符号整数
 // 返回值类型: Integer, 返回递减后的值
 func (c *Client) Decr(key string) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("DECR", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("DECR", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // DecrBy v1.0.0后可用
@@ -35,9 +43,11 @@ func (c *Client) Decr(key string) (*Reply, error) {
 // 本操作仅限于64位有符号整数
 // 返回值类型: Integer, 返回递减后的值
 func (c *Client) DecrBy(key string, decrement int64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("DECRBY", key, decrement)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("DECRBY", key, decrement)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // Get v1.0.0后可用
@@ -47,9 +57,11 @@ func (c *Client) DecrBy(key string, decrement int64) (*Reply, error) {
 // Get只用于操作字符串类型的key, 如果key存储的不是字符串类型, 则返回错误
 // 返回值类型: Bulk String或者nil(key不存在时)
 func (c *Client) Get(key string) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("GET", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("GET", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // GetDel v6.2.0后可用
@@ -58,9 +70,11 @@ func (c *Client) Get(key string) (*Reply, error) {
 // 获取key的值后将key删除, 只能操作于字符串类型的key
 // 返回值类型: Bulk String或者nil(key不存在时)
 func (c *Client) GetDel(key string) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("GETDEL", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("GETDEL", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // GetEx v6.2.0后可用
@@ -75,20 +89,20 @@ func (c *Client) GetDel(key string) (*Reply, error) {
 // PERSIST: 移除key的有效期, 使其长期有效
 // 返回值类型: Bulk String或者nil(key不存在时)
 func (c *Client) GetEx(key string, op string, opValue int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("GETEX", key)
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("GETEX", key)
 	switch strings.ToUpper(op) {
 	case "EX", "PX", "EXAT", "PXAT":
-		args.AppendArgs(op, opValue)
+		cmd.AppendArgs(op, opValue)
 	case "PERSIST":
-		args.Append(op)
+		cmd.Append(op)
 	case "":
 		break
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GetRange v2.4.0后可用
@@ -97,9 +111,11 @@ func (c *Client) GetEx(key string, op string, opValue int64) (*Reply, error) {
 // 获取key的值的子串, start和end可以为负, 表示从字符串末尾开始, -1表示最后一个字符, -2表示倒数第二个字符
 // 返回值类型: Bulk String
 func (c *Client) GetRange(key string, start, end int64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("GETRANGE", key, start, end)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("GETRANGE", key, start, end)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // GetSet v6.2.0前可用
@@ -109,9 +125,11 @@ func (c *Client) GetRange(key string, start, end int64) (*Reply, error) {
 // 返回值类型: Bulk String, 返回key存储的旧值或者nil(key不存在时)
 // v6.2.0后可用带有GET参数的SET命令替代GETSET
 func (c *Client) GetSet(key string, value interface{}) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("GETSET", key, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("GETSET", key, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // Incr v1.0.0后可用
@@ -123,9 +141,11 @@ func (c *Client) GetSet(key string, value interface{}) (*Reply, error) {
 // Redis以整数表示形式存储整数，因此对于实际保存整数的字符串值, 存储整数的字符串表示形式没有开销
 // 返回值类型: Integer, 返回加1后的key值
 func (c *Client) Incr(key string) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("INCR", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("INCR", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // IncrBy v1.0.0后可用
@@ -137,9 +157,11 @@ func (c *Client) Incr(key string) (*Reply, error) {
 // Redis以整数表示形式存储整数，因此对于实际保存整数的字符串值, 存储整数的字符串表示形式没有开销
 // 返回值类型: Integer, 返回加1后的key值
 func (c *Client) IncrBy(key string, increment int64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("INCRBY", key, increment)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("INCRBY", key, increment)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // IncrByFloat v2.6.0后可用
@@ -157,9 +179,11 @@ func (c *Client) IncrBy(key string, increment int64) (*Reply, error) {
 // 无论计算的实际内部精度如何, 输出的精度都固定在小数点后17位
 // 返回值类型: Bulk String, 计算增量后的key值
 func (c *Client) IncrByFloat(key string, increment float64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("INCRBYFLOAT", key, increment)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("INCRBYFLOAT", key, increment)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // LCS v7.0.0后可用
@@ -175,21 +199,23 @@ func (c *Client) IncrByFloat(key string, increment float64) (*Reply, error) {
 // 3. 当给定 IDX 时，该命令返回一个数组，其中包含 LCS 长度和两个字符串中的所有范围、每个字符串的开始和结束偏移量，其中有匹配项。
 //    当给定 WITHMATCHLEN 时，表示匹配的每个数组也将具有匹配的长度
 func (c *Client) LCS(key1, key2 string, LEN, IDX, withMatchLen bool, minMatchLen int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("LCS", key1, key2)
+	cmd := args.Get()
+	cmd.Append("LCS", key1, key2)
 	if LEN {
-		args.Append("LEN")
+		cmd.Append("LEN")
 	}
 	if IDX {
-		args.Append("IDX")
+		cmd.Append("IDX")
 	}
 	if minMatchLen > 0 {
-		args.AppendArgs("MINMATCHLEN", minMatchLen)
+		cmd.AppendArgs("MINMATCHLEN", minMatchLen)
 	}
 	if withMatchLen {
-		args.Append("WITHMATCHLEN")
+		cmd.Append("WITHMATCHLEN")
 	}
-	return c.sendCommand(args)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // MGet v1.0.0后可用
@@ -198,10 +224,12 @@ func (c *Client) LCS(key1, key2 string, LEN, IDX, withMatchLen bool, minMatchLen
 // 返回指定keys的值, 对于每个不存在或者值类型不为字符串的key, 该key的结果将会返回nil
 // 返回值类型: Array
 func (c *Client) MGet(keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("MGET")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("MGET")
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // MSet v1.0.1后可用
@@ -211,17 +239,17 @@ func (c *Client) MGet(keys ...string) (*Reply, error) {
 // MSET命令是原子操作, 所以将不会存在一些key设置成功, 而一些key确设置失败
 // 返回值类型: Simple String, 总是OK, 因为MSET不会失败
 func (c *Client) MSet(kvs ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("MSET")
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("MSET")
 	if len(kvs) == 1 {
-		if err := appendArgs(args, kvs[0]); err != nil {
-			putArgs(args)
+		if err := appendArgs(cmd, kvs[0]); err != nil {
 			return nil, err
 		}
 	} else {
-		args.AppendArgs(kvs...)
+		cmd.AppendArgs(kvs...)
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // MSetNX v1.0.1后可用
@@ -231,17 +259,17 @@ func (c *Client) MSet(kvs ...interface{}) (*Reply, error) {
 // 同样MSETNX也是原子操作
 // 返回值类型: Integer, 如果所有key都被设置成功返回1; 否则返回0
 func (c *Client) MSetNX(kvs ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("MSETNX")
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("MSETNX")
 	if len(kvs) == 1 {
-		if err := appendArgs(args, kvs[0]); err != nil {
-			putArgs(args)
+		if err := appendArgs(cmd, kvs[0]); err != nil {
 			return nil, err
 		}
 	} else {
-		args.AppendArgs(kvs...)
+		cmd.AppendArgs(kvs...)
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // PSetEX v2.6.0后可用
@@ -250,9 +278,11 @@ func (c *Client) MSetNX(kvs ...interface{}) (*Reply, error) {
 // 设置key的值为value, 同时设置key的有效期为milli毫秒
 // 返回值类型: Simple String, Ok
 func (c *Client) PSetEX(key string, value interface{}, milli int64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("PSETEX", key, value, milli)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("PSETEX", key, value, milli)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // Set v1.0.0后可用
@@ -278,33 +308,32 @@ func (c *Client) PSetEX(key string, value interface{}, milli int64) (*Reply, err
 // get: [true|false]
 // expireOp: [EX|PX|EXAT|PXAT|KEEPTTL]
 func (c *Client) Set(key string, value interface{}, op string, get bool, expireOp string, expireValue int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SET", key)
-	args.AppendArgs(value)
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("SET", key)
+	cmd.AppendArgs(value)
 	switch strings.ToUpper(op) {
 	case "NX", "XX":
-		args.Append(op)
+		cmd.Append(op)
 	case "":
 		break
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 	if get {
-		args.Append("GET")
+		cmd.Append("GET")
 	}
 	switch strings.ToUpper(expireOp) {
 	case "EX", "PX", "EXAT", "PXAT":
-		args.AppendArgs(expireOp, expireValue)
+		cmd.AppendArgs(expireOp, expireValue)
 	case "KEEPTTL":
-		args.Append("KEEPTTL")
+		cmd.Append("KEEPTTL")
 	case "":
 		break
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // SetEX v2.0.0后可用
@@ -313,9 +342,11 @@ func (c *Client) Set(key string, value interface{}, op string, get bool, expireO
 // 设置key的同时设置其有效期, 单位为秒, SETEX命令是原子操作, 如果有效期不可用时将返回错误
 // 返回值类型: Simple String
 func (c *Client) SetEX(key string, value interface{}, sec int64) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("SETEX", key, sec, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("SETEX", key, sec, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SetNX v1.0.0后可用
@@ -324,9 +355,11 @@ func (c *Client) SetEX(key string, value interface{}, sec int64) (*Reply, error)
 // 将key值设置为value当且仅当key不存在时, key如果存在则不做任何操作
 // 返回值类型: Integer
 func (c *Client) SetNX(key string, value interface{}) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("SETNX", key, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("SETNX", key, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SetRange v2.2.0后可用
@@ -335,9 +368,11 @@ func (c *Client) SetNX(key string, value interface{}) (*Reply, error) {
 // 从offset开始到字符串结尾覆盖key存储的字符串
 // 返回值类型: Integer, 返回操作后的字符串长度
 func (c *Client) SetRange(key string, offset int64, value interface{}) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("SETRANGE", key, offset, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("SETRANGE", key, offset, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // StrLen v2.2.0后可用
@@ -346,7 +381,9 @@ func (c *Client) SetRange(key string, offset int64, value interface{}) (*Reply, 
 // 返回key对应的字符串的长度, 如果key值不是字符串则返回错误
 // 返回值类型: Integer, 返回字符串长度或者0(当key不存在时)
 func (c *Client) StrLen(key string) (*Reply, error) {
-	args := getArgs()
-	args.AppendArgs("STRLEN", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.AppendArgs("STRLEN", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }

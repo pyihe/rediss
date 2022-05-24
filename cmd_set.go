@@ -1,5 +1,7 @@
 package rediss
 
+import "github.com/pyihe/rediss/args"
+
 // SAdd v1.0.0后可用
 // 命令格式: SADD key member [member ...]
 // 时间复杂度: O(N), N为需要添加的元素数量
@@ -8,10 +10,12 @@ package rediss
 // 返回值类型: Integer, 最终添加的成员数量, 不包含已经存在的成员
 // v2.4.0后开始支持接收多个成员参数
 func (c *Client) SAdd(key string, members ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("SADD", key)
-	args.AppendArgs(members...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SADD", key)
+	cmd.AppendArgs(members...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SCard v1.0.0后可用
@@ -20,9 +24,11 @@ func (c *Client) SAdd(key string, members ...interface{}) (*Reply, error) {
 // 返回存储在key指定集合的成员数量
 // 返回值类型: Integer, 返回成员数量, 如果key不存在返回0
 func (c *Client) SCard(key string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SCARD", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SCARD", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SDiff v1.0.0后可用
@@ -31,10 +37,12 @@ func (c *Client) SCard(key string) (*Reply, error) {
 // 获取第一个key对应的set和其他key对应的set之间不同成员构成的set
 // 返回值类型: Array, 返回差异集合的所有成员
 func (c *Client) SDiff(keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SDIFF")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SDIFF")
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SDiffStore v1.0.0后可用
@@ -43,10 +51,12 @@ func (c *Client) SDiff(keys ...string) (*Reply, error) {
 // 获取第一个key对应的set和其他key对应的set之间不同成员构成的set, 并将结果set的值存储进dst中, 如果dst已经存在, 命令将会覆盖其旧值
 // 返回值类型: Integer, 返回差异集合的成员数量
 func (c *Client) SDiffStore(dst string, keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SDIFFSTORE", dst)
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SDIFFSTORE", dst)
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SInter v1.0.0后可用
@@ -56,10 +66,12 @@ func (c *Client) SDiffStore(dst string, keys ...string) (*Reply, error) {
 // 如果key不存在将会被视为空set, 交集也将会是空
 // 返回值类型: Array, 结果集合的成员
 func (c *Client) SInter(keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SINTER")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SINTER")
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SInterCard v7.0.0后可用
@@ -70,14 +82,16 @@ func (c *Client) SInter(keys ...string) (*Reply, error) {
 // 如果提供了LIMIT(默认为0, 表示无限制)选项,
 // 返回值类型: Integer, 返回结果set的元素数量
 func (c *Client) SInterCard(keys []string, limit int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SINTERCARD")
-	args.AppendArgs(len(keys))
-	args.Append(keys...)
+	cmd := args.Get()
+	cmd.Append("SINTERCARD")
+	cmd.AppendArgs(len(keys))
+	cmd.Append(keys...)
 	if limit > 0 {
-		args.AppendArgs("LIMIT", limit)
+		cmd.AppendArgs("LIMIT", limit)
 	}
-	return c.sendCommand(args)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SInterStore v1.0.0后可用
@@ -87,10 +101,12 @@ func (c *Client) SInterCard(keys []string, limit int64) (*Reply, error) {
 // 如果dst已经存在, SINTERSTORE将会覆盖其旧值
 // 返回值类型: 返回结果集合的元素数量
 func (c *Client) SInterStore(dst string, keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SINTERSTORE")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SINTERSTORE", dst)
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SIsMember v1.0.0后可用
@@ -99,10 +115,12 @@ func (c *Client) SInterStore(dst string, keys ...string) (*Reply, error) {
 // 判断member是否是key对应的集合的成员
 // 返回值类型: Integer, 如果是返回1, 如果不是或者key不存在则返回0
 func (c *Client) SIsMember(key string, member interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("SISMEMBER", key)
-	args.AppendArgs(member)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SISMEMBER", key)
+	cmd.AppendArgs(member)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SMembers v1.0.0后可用
@@ -111,9 +129,11 @@ func (c *Client) SIsMember(key string, member interface{}) (*Reply, error) {
 // 获取key对应的集合的所有成员
 // 返回值类型: Array, 返回成员组成的数组
 func (c *Client) SMembers(key string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SMEMBERS", key)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SMEMBERS", key)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SMIsMember v6.2.0后可用
@@ -122,10 +142,12 @@ func (c *Client) SMembers(key string) (*Reply, error) {
 // 判断members中的每个值是否都是key对应set的成员
 // 返回值类型: Array, 按照提供的成员顺序返回每个成员的校验结果, 如果是set的成员返回1, 不是或者key不存在时返回0
 func (c *Client) SMIsMember(key string, members ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("SMISMEMBER", key)
-	args.AppendArgs(members...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SMISMEMBER", key)
+	cmd.AppendArgs(members...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SMove v1.0.0后可用
@@ -137,10 +159,12 @@ func (c *Client) SMIsMember(key string, members ...interface{}) (*Reply, error) 
 // 如果源集合或者目标集合所持有的数据类型不是集合, 将会返回一个错误
 // 返回值类型: Integer, 移动成功返回1, 如果源集合不包含指定成员没有操作被执行时返回0
 func (c *Client) SMove(src, dst string, member interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("SMOVE", src, dst)
-	args.AppendArgs(member)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SMOVE", src, dst)
+	cmd.AppendArgs(member)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SPop v1.0.0后可用
@@ -152,12 +176,14 @@ func (c *Client) SMove(src, dst string, member interface{}) (*Reply, error) {
 // 1. 没有提供count选项时: Bulk String, 返回被移除的成员, 如果key不存在时返回nil
 // 2. 提供了count参数时: Array, 返回被移除的成员, 如果key不存在时返回一个空的数组
 func (c *Client) SPop(key string, count int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SPOP", key)
+	cmd := args.Get()
+	cmd.Append("SPOP", key)
 	if count > 1 {
-		args.AppendArgs(count)
+		cmd.AppendArgs(count)
 	}
-	return c.sendCommand(args)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SRandMember v1.0.0后可用
@@ -175,12 +201,14 @@ func (c *Client) SPop(key string, count int64) (*Reply, error) {
 // 有count参数: Array, 返回随机的成员列表, 如果key不存在返回空数组
 // v2.6.0后开始支持count参数
 func (c *Client) SRandMember(key string, count int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SRANDMEMBER", key)
+	cmd := args.Get()
+	cmd.Append("SRANDMEMBER", key)
 	if count != 0 {
-		args.AppendArgs(count)
+		cmd.AppendArgs(count)
 	}
-	return c.sendCommand(args)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SRem v1.0.0后可用
@@ -191,10 +219,12 @@ func (c *Client) SRandMember(key string, count int64) (*Reply, error) {
 // 返回值类型: Integer, 集合被删除的元素个数
 // v2.4.0开始支持多个成员参数
 func (c *Client) SRem(key string, members ...interface{}) (*Reply, error) {
-	args := getArgs()
-	args.Append("SREM", key)
-	args.AppendArgs(members...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SREM", key)
+	cmd.AppendArgs(members...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SScan v2.8.0后可用
@@ -202,16 +232,18 @@ func (c *Client) SRem(key string, members ...interface{}) (*Reply, error) {
 // 时间复杂度: O(N), N为scan结果中元素数量
 // 返回值类型: Array, 数组的元素为集合的成员
 func (c *Client) SScan(key string, cursor int64, pattern string, count int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SSCAN", key)
-	args.AppendArgs(cursor)
+	cmd := args.Get()
+	cmd.Append("SSCAN", key)
+	cmd.AppendArgs(cursor)
 	if pattern != "" {
-		args.Append("MATCH", pattern)
+		cmd.Append("MATCH", pattern)
 	}
 	if count > 0 {
-		args.AppendArgs("COUNT", count)
+		cmd.AppendArgs("COUNT", count)
 	}
-	return c.sendCommand(args)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SUnion v1.0.0后可用
@@ -220,10 +252,12 @@ func (c *Client) SScan(key string, cursor int64, pattern string, count int64) (*
 // 获取指定集合的并集, 如果集合不存在将会被视为空集合
 // 返回值类型: Array, 返回并集中的成员
 func (c *Client) SUnion(keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SUNION")
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SUNION")
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SUnionStore v1.0.0后可用
@@ -233,8 +267,10 @@ func (c *Client) SUnion(keys ...string) (*Reply, error) {
 // 如果dst已经存在, SUNIONSTORE会将其旧值覆盖
 // 返回值类型: Integer, 返回存储后dst的成员数量
 func (c *Client) SUnionStore(dst string, keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("SUNIONSTORE", dst)
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SUNIONSTORE", dst)
+	cmd.Append(keys...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }

@@ -4,7 +4,8 @@ import (
 	"strings"
 
 	"github.com/pyihe/go-pkg/errors"
-	"github.com/pyihe/rediss/geo"
+	"github.com/pyihe/rediss/args"
+	"github.com/pyihe/rediss/model/geo"
 )
 
 // GeoAdd v3.2.0后可用
@@ -28,22 +29,24 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error
 	if len(members) == 0 {
 		return nil, errors.New("GEOADD need pass member arguments at least one")
 	}
-	args := getArgs()
-	args.Append("GEOADD", key)
+
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEOADD", key)
 	switch strings.ToUpper(op) {
 	case "XX", "NX", "CH":
-		args.Append(op)
+		cmd.Append(op)
 	case "":
 		break
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
 
 	for _, me := range members {
-		args.AppendArgs(me.Longitude, me.Latitude, me.Name)
+		cmd.AppendArgs(me.Longitude, me.Latitude, me.Name)
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GeoDist v3.2.0后可用
@@ -58,18 +61,19 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error
 // FT: 单位英尺
 // 返回值类型: Bulk String, 返回nil或者双精度浮点数的距离
 func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Reply, error) {
-	args := getArgs()
-	args.Append("GEODIST", key, member1, member2)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEODIST", key, member1, member2)
 	switch strings.ToUpper(unit) {
 	case "M", "KM", "FT", "MI":
-		args.Append(unit)
+		cmd.Append(unit)
 	case "":
 		break
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GeoHash v3.2.0后可用
@@ -78,10 +82,10 @@ func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Rep
 // 返回一个或者多个地理位置的有效GeoHash字符串
 // 返回值类型: Array
 func (c *Client) GeoHash(key string, members ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("GEOHASH", key)
-	args.Append(members...)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("GEOHASH", key)
+	cmd.Append(members...)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GeoPos v3.2.0后可用
@@ -91,16 +95,15 @@ func (c *Client) GeoHash(key string, members ...string) (*Reply, error) {
 // 返回值类型: Array, 不存在的元素返回值将会是nil
 func (c *Client) GeoPos(key string, members ...string) ([]*geo.Location, error) {
 	// 组装参数
-	var args = getArgs()
-	defer putArgs(args)
+	cmd := args.Get()
+	defer args.Put(cmd)
 
-	args.Append("GEOPOS", key)
-	args.Append(members...)
+	cmd.Append("GEOPOS", key)
+	cmd.Append(members...)
 
 	// 获取回复
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
-		putArgs(args)
 		return nil, err
 	}
 
@@ -136,41 +139,41 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *ge
 		return nil, ErrEmptyOptionArgument
 	}
 
-	args := getArgs()
-	defer putArgs(args)
+	cmd := args.Get()
+	defer args.Put(cmd)
 
-	args.Append("GEORADIUS_RO", key)
-	args.AppendArgs(longitude, latitude)
-	args.AppendArgs(option.Radius)
+	cmd.Append("GEORADIUS_RO", key)
+	cmd.AppendArgs(longitude, latitude)
+	cmd.AppendArgs(option.Radius)
 
 	if option.StoreDist != "" || option.Store != "" {
 		return nil, errors.New("GEORADIUS_RO not support STORE or STOREDIST arguments")
 	}
 
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
 
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -211,40 +214,42 @@ func (c *Client) GeoRadius(key string, longitude, latitude float64, option *geo.
 	if option.Store != "" || option.StoreDist != "" {
 		return nil, errors.New("GeoRadius not support STORE or STOREDIST arguments")
 	}
-	args := getArgs()
-	args.Append("GEORADIUS", key)
-	args.AppendArgs(longitude, latitude)
-	args.AppendArgs(option.Radius)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEORADIUS", key)
+	cmd.AppendArgs(longitude, latitude)
+	cmd.AppendArgs(option.Radius)
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
 	if option.Store != "" {
-		args.Append("STORE", option.Store)
+		cmd.Append("STORE", option.Store)
 	}
 	if option.StoreDist != "" {
-		args.Append("STOREDIST", option.StoreDist)
+		cmd.Append("STOREDIST", option.StoreDist)
 	}
 
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -259,40 +264,42 @@ func (c *Client) GeoRadiusStore(key string, longitude, latitude float64, option 
 	if option.Store == "" && option.StoreDist == "" {
 		return nil, errors.New("GeoRadiusStore need STORE or STOREDIST arguments")
 	}
-	args := getArgs()
-	args.Append("GEORADIUS", key)
-	args.AppendArgs(longitude, latitude)
-	args.AppendArgs(option.Radius)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEORADIUS", key)
+	cmd.AppendArgs(longitude, latitude)
+	cmd.AppendArgs(option.Radius)
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
 	if option.Store != "" {
-		args.Append("STORE", option.Store)
+		cmd.Append("STORE", option.Store)
 	}
 	if option.StoreDist != "" {
-		args.Append("STOREDIST", option.StoreDist)
+		cmd.Append("STOREDIST", option.StoreDist)
 	}
 
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GeoRadiusByMember v3.2.0后可用, v6.2.0开始被视为废弃
@@ -306,32 +313,34 @@ func (c *Client) GeoRadiusByMember(key, member string, option *geo.RadiusOption)
 	if option.Store != "" || option.StoreDist != "" {
 		return nil, errors.New("GeoRadiusByMember not support STORE or STOREDIST arguments")
 	}
-	args := getArgs()
-	args.Append("GEORADIUSBYMEMBER", key, member)
-	args.AppendArgs(option.Radius)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEORADIUSBYMEMBER", key, member)
+	cmd.AppendArgs(option.Radius)
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -346,32 +355,34 @@ func (c *Client) GeoRadiusByMemberStore(key, member string, option *geo.RadiusOp
 	if option.Store == "" && option.StoreDist == "" {
 		return nil, errors.New("GeoRadiusByMemberStore need STORE or STOREDIST arguments")
 	}
-	args := getArgs()
-	args.Append("GEORADIUSBYMEMBER", key, member)
-	args.AppendArgs(option.Radius)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEORADIUSBYMEMBER", key, member)
+	cmd.AppendArgs(option.Radius)
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GeoRadiusByMemberRo v3.2.10和4.0.0后可用
@@ -382,36 +393,37 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *geo.RadiusOptio
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
-	args := getArgs()
-	args.Append("GEORADIUSBYMEMBER_RO", key, member)
-	args.AppendArgs(option.Radius)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEORADIUSBYMEMBER_RO", key, member)
+	cmd.AppendArgs(option.Radius)
 	if option.StoreDist != "" || option.Store != "" {
-		putArgs(args)
 		return nil, errors.New("GeoRadiusByMemberRo not support STORE or STOREDIST arguments")
 	}
 	if option.Unit != "" {
-		args.Append(option.Unit)
+		cmd.Append(option.Unit)
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -443,50 +455,52 @@ func (c *Client) GeoSearch(key string, option *geo.SearchOption) ([]*geo.Locatio
 	if option.StoreDist != "" {
 		return nil, errors.New("GeoSearch not support STOREDIST argument")
 	}
-	args := getArgs()
-	args.Append("GEOSEARCH", key)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEOSEARCH", key)
 	if option.Member != "" {
-		args.Append("FROMMEMBER", option.Member)
+		cmd.Append("FROMMEMBER", option.Member)
 	} else {
-		args.Append("FROMLONLAT")
-		args.AppendArgs(option.Longitude, option.Latitude)
+		cmd.Append("FROMLONLAT")
+		cmd.AppendArgs(option.Longitude, option.Latitude)
 	}
 	if option.Radius > 0 {
-		args.Append("BYRADIUS")
-		args.AppendArgs(option.Radius)
+		cmd.Append("BYRADIUS")
+		cmd.AppendArgs(option.Radius)
 		if option.RadiusUnit != "" {
-			args.Append(option.RadiusUnit)
+			cmd.Append(option.RadiusUnit)
 		}
 	} else {
-		args.Append("BYBOX")
-		args.AppendArgs(option.Width, option.Height)
+		cmd.Append("BYBOX")
+		cmd.AppendArgs(option.Width, option.Height)
 		if option.BoxUnit != "" {
-			args.Append(option.BoxUnit)
+			cmd.Append(option.BoxUnit)
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.StoreDist != "" {
-		args.Append(option.StoreDist)
+		cmd.Append(option.StoreDist)
 	}
-	reply, err := c.sendCommand(args)
+	reply, err := c.sendCommand(cmd.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -508,50 +522,52 @@ func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (*Reply, e
 	if option.StoreDist == "" {
 		return nil, errors.New("GeoSearchStore need STOREDIST argument")
 	}
-	args := getArgs()
-	args.Append("GEOSEARCHSTORE", key)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("GEOSEARCHSTORE", key)
 	if option.Member != "" {
-		args.Append("FROMMEMBER", option.Member)
+		cmd.Append("FROMMEMBER", option.Member)
 	} else {
-		args.Append("FROMLONLAT")
-		args.AppendArgs(option.Longitude, option.Latitude)
+		cmd.Append("FROMLONLAT")
+		cmd.AppendArgs(option.Longitude, option.Latitude)
 	}
 	if option.Radius > 0 {
-		args.Append("BYRADIUS")
-		args.AppendArgs(option.Radius)
+		cmd.Append("BYRADIUS")
+		cmd.AppendArgs(option.Radius)
 		if option.RadiusUnit != "" {
-			args.Append(option.RadiusUnit)
+			cmd.Append(option.RadiusUnit)
 		}
 	} else {
-		args.Append("BYBOX")
-		args.AppendArgs(option.Width, option.Height)
+		cmd.Append("BYBOX")
+		cmd.AppendArgs(option.Width, option.Height)
 		if option.BoxUnit != "" {
-			args.Append(option.BoxUnit)
+			cmd.Append(option.BoxUnit)
 		}
 	}
 	if option.Sort != "" {
-		args.Append(option.Sort)
+		cmd.Append(option.Sort)
 	}
 	if option.Count > 0 {
-		args.Append("COUNT")
-		args.AppendArgs(option.Count)
+		cmd.Append("COUNT")
+		cmd.AppendArgs(option.Count)
 		if option.Any {
-			args.Append("ANY")
+			cmd.Append("ANY")
 		}
 	}
 	if option.WithCoord {
-		args.Append("WITHCOORD")
+		cmd.Append("WITHCOORD")
 	}
 	if option.WithDist {
-		args.Append("WITHDIST")
+		cmd.Append("WITHDIST")
 	}
 	if option.WithHash {
-		args.Append("WITHHASH")
+		cmd.Append("WITHHASH")
 	}
 	if option.StoreDist != "" {
-		args.Append(option.StoreDist)
+		cmd.Append(option.StoreDist)
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 func readLocation(reply *Reply, option interface{}) (result []*geo.Location) {

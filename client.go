@@ -5,12 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/go-pkg/serialize"
+	"github.com/pyihe/rediss/args"
 )
 
 type Client struct {
 	address      string               // redis地址
+	username     string               // 用户名
 	password     string               // 密码
 	database     int                  // db索引
 	poolSize     int                  // 连接池大小
@@ -42,19 +43,12 @@ func New(opts ...Option) *Client {
 	return c
 }
 
-func (c *Client) RunCommand(cmd string, args ...interface{}) (*Reply, error) {
-	cmdArgs := getArgs()
-	cmdArgs.Append(cmd)
-	cmdArgs.AppendArgs(args...)
-	return c.sendCommand(cmdArgs)
-}
-
-func (c *Client) sendCommand(args *Args) (result *Reply, err error) {
+func (c *Client) sendCommand(cmd []byte) (result *Reply, err error) {
 	conn, newConn, err := c.popConn()
 	if err != nil {
 		goto end
 	}
-	result, err = conn.writeCommand(args, c.writeTimeout, c.readTimeout)
+	result, err = conn.writeCommand(cmd, c.writeTimeout, c.readTimeout)
 	if err != nil {
 		goto end
 	}
@@ -82,43 +76,34 @@ func (c *Client) connect() (*conn, error) {
 	}
 	connection := newConn(rConn)
 	if len(c.password) > 0 {
-		args := getArgs()
-		args.Append("AUTH", c.password)
-		reply, err := connection.writeCommand(args, c.writeTimeout, c.readTimeout)
+		cmd := args.Get()
+		defer args.Put(cmd)
+
+		cmd.Append("AUTH", c.password)
+		_, err = connection.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
 		if err != nil {
 			return nil, err
 		}
-		if reply.GetString() != "OK" {
-			return nil, errors.New("failed to auth")
-		}
 	}
-	args := getArgs()
-	args.Append("SELECT", strconv.FormatInt(int64(c.database), 10))
-	reply, err := connection.writeCommand(args, c.writeTimeout, c.readTimeout)
-	if err != nil {
-		return nil, err
-	}
-	if reply.GetString() != "OK" {
-		return nil, errors.New("failed to select database")
-	}
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("SELECT", strconv.FormatInt(int64(c.database), 10))
+	_, err = connection.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
 	return connection, err
 }
 
 func (c *Client) popConn() (conn *conn, isNew bool, err error) {
 	if conn = <-c.connPool; conn != nil {
-		args := getArgs()
-		args.Append("PING")
-		reply, err1 := conn.writeCommand(args, c.writeTimeout, c.readTimeout)
-		if err1 != nil {
-			err = err1
-			goto end
-		}
-		if reply.GetString() != "PONG" {
-			err = errors.New("failed to ping")
-			goto end
+		cmd := args.Get()
+		defer args.Put(cmd)
+
+		cmd.Append("PING")
+		_, err = conn.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
+		if err != nil {
+			return
 		}
 	}
-end:
 	isNew = true
 	conn, err = c.connect()
 	return

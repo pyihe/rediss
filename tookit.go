@@ -5,6 +5,7 @@ import (
 
 	innerBytes "github.com/pyihe/go-pkg/bytes"
 	"github.com/pyihe/go-pkg/errors"
+	"github.com/pyihe/rediss/args"
 )
 
 func assertDatabase(db int) {
@@ -56,7 +57,7 @@ func parse(reply interface{}) (result *Reply) {
 	return
 }
 
-func appendArgs(args *Args, arg interface{}) (err error) {
+func appendArgs(args *args.Args, arg interface{}) (err error) {
 	switch data := arg.(type) {
 	case []string:
 		args.Append(data...)

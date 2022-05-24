@@ -1,6 +1,10 @@
 package rediss
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/pyihe/rediss/args"
+)
 
 // BitCount v2.6.0后可用
 // 命令格式: BITCOUNT key [ start end [ BYTE | BIT]]
@@ -13,32 +17,34 @@ import "strings"
 // 默认情况下, 附加参数start和end指定字节索引; 我们可以使用附加参数BIT来指定位索引
 // 返回值类型: Integer, 被设置为1的位的数量
 func (c *Client) BitCount(key string, start, end int64, unit string) (*Reply, error) {
-	args := getArgs()
-	args.Append("BITCOUNT", key)
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("BITCOUNT", key)
 	if start != 0 && end != 0 {
-		args.AppendArgs(start, end)
+		cmd.AppendArgs(start, end)
 		switch strings.ToUpper(unit) {
 		case "BYTE", "BIT":
-			args.Append(unit)
+			cmd.Append(unit)
 		case "":
 			break
 		default:
-			putArgs(args)
 			return nil, ErrInvalidArgumentFormat
 		}
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // BitField v3.2.0后可用
 // 命令格式: BITFIELD key GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment [ GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment ...]
 // 时间复杂度: O(1)对于每个指定的子命令
 // 返回值类型: 该命令返回一个数组，其中每个条目是在同一位置给出的子命令的相应结果。 OVERFLOW 子命令不计为生成回复
-func (c *Client) BitField(key string, args ...interface{}) (*Reply, error) {
-	cmdArgs := getArgs()
-	cmdArgs.Append("BITFIELD", key)
-	cmdArgs.AppendArgs(args...)
-	return c.sendCommand(cmdArgs)
+func (c *Client) BitField(key string, arguments ...interface{}) (*Reply, error) {
+	cmd := args.Get()
+	cmd.Append("BITFIELD", key)
+	cmd.AppendArgs(arguments...)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // BitOp v2.6.0后可用
@@ -54,17 +60,17 @@ func (c *Client) BitField(key string, args ...interface{}) (*Reply, error) {
 // 当在具有不同长度的字符串之间执行操作时，所有比集合中最长字符串短的字符串都被视为补零直到最长字符串的长度
 // 返回值类型: Integer, 存储在目标键中的字符串的大小，即等于最长输入字符串的大小
 func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
-	args := getArgs()
-	args.Append("BITOP")
+	cmd := args.Get()
+	defer args.Put(cmd)
+	cmd.Append("BITOP")
 	switch strings.ToUpper(op) {
 	case "AND", "OR", "XOR", "NOT":
-		args.Append(op, dst)
+		cmd.Append(op, dst)
 	default:
-		putArgs(args)
 		return nil, ErrInvalidArgumentFormat
 	}
-	args.Append(keys...)
-	return c.sendCommand(args)
+	cmd.Append(keys...)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // BitPos v2.8.7后可用
@@ -84,25 +90,26 @@ func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 // 基本上, 如果您查找清除位并且不指定范围或仅指定开始参数, 该函数会将字符串的右侧视为用零填充
 // 但是, 如果您正在寻找清除位并指定包含开始和结束的范围, 则此行为会发生变化。如果在指定范围内没有找到清除位, 则函数返回-1, 因为用户指定了一个清除范围并且该范围内没有0位
 func (c *Client) BitPos(key string, bit int64, start, end int64, unit string) (*Reply, error) {
-	args := getArgs()
-	args.Append("BITPOS", key)
-	args.AppendArgs(bit)
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("BITPOS", key)
+	cmd.AppendArgs(bit)
 	if start != 0 {
-		args.AppendArgs(start)
+		cmd.AppendArgs(start)
 		if end != 0 {
-			args.AppendArgs(end)
+			cmd.AppendArgs(end)
 			switch strings.ToUpper(unit) {
 			case "BYTE", "BIT":
-				args.Append(unit)
+				cmd.Append(unit)
 			case "":
 				break
 			default:
-				putArgs(args)
 				return nil, ErrInvalidArgumentFormat
 			}
 		}
 	}
-	return c.sendCommand(args)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // GetBit v2.2.0后可用
@@ -112,10 +119,12 @@ func (c *Client) BitPos(key string, bit int64, start, end int64, unit string) (*
 // 当offset超过字符串长度时, 字符串被假定为一个0位的连续空间; 当key不存在时, 它被假定为一个空字符串, 因此偏移量总是超出范围, 并且该值也被假定为一个0位的连续空间
 // 返回值类型: Integer, 返回offset处的位值
 func (c *Client) GetBit(key string, offset int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("GETBIT", key)
-	args.AppendArgs(offset)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("GETBIT", key)
+	cmd.AppendArgs(offset)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // SetBit v2.2.0后可用
@@ -126,8 +135,10 @@ func (c *Client) GetBit(key string, offset int64) (*Reply, error) {
 // 当key不存在时, 创建一个新的字符串: 字符串被增长以确保它可以在偏移量处设置值。偏移量参数必须大于或等于0, 并且小于2^32(这将位图限制为512MB); 当key处的字符串增长时, 添加的位设置为0
 // 返回值类型: Integer, 返回存储在offset的原始bit值
 func (c *Client) SetBit(key string, offset int64, value int64) (*Reply, error) {
-	args := getArgs()
-	args.Append("SETBIT", key)
-	args.AppendArgs(offset, value)
-	return c.sendCommand(args)
+	cmd := args.Get()
+	cmd.Append("SETBIT", key)
+	cmd.AppendArgs(offset, value)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
