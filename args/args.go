@@ -33,6 +33,14 @@ func Put(args *Args) {
 	pool.Put(args)
 }
 
+func Command(args ...interface{}) (b []byte) {
+	cmd := Get()
+	cmd.AppendArgs(args...)
+	b = cmd.Bytes()
+	Put(cmd)
+	return
+}
+
 type Args []string
 
 func (a *Args) String() string {
@@ -124,7 +132,8 @@ func (a *Args) Bytes() (b []byte) {
 		_, _ = buf.WriteString(v)
 		_, _ = buf.WriteString(separator)
 	}
-	b = buf.Bytes()
+	b = make([]byte, buf.Len())
+	copy(b, buf.B)
 	innerBytes.Put(buf)
 	return
 }
