@@ -16,4 +16,3 @@
 
 .idea/
 cmd/
-*_test.go
