@@ -1,9 +1,13 @@
 package rediss
 
 import (
+	"strconv"
 	"strings"
 
+	innerBytes "github.com/pyihe/go-pkg/bytes"
+	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
+	"github.com/pyihe/rediss/model/bitmap"
 )
 
 // BitCount v2.6.0后可用
@@ -34,17 +38,133 @@ func (c *Client) BitCount(key string, start, end int64, unit string) (*Reply, er
 	return c.sendCommand(cmd.Bytes())
 }
 
+// BitFieldGet v3.2.0后可用
+// 命令格式: BITFIELD key GET encoding offset [ GET encoding offset ...]
+// 时间复杂度: 每个子命令的时间复杂度为: O(1)
+// BITFIELD只读属性的命令, 类似于GEORADIUS_RO
+// 返回值类型: Integer, 返回GET指定位的值
+func (c *Client) BitFieldGet(key string, opts ...*bitmap.FieldOption) (*Reply, error) {
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("BITFIELD", key)
+
+	buf := innerBytes.Get()
+	for _, op := range opts {
+		if op == nil {
+			continue
+		}
+		if err := op.Check(true); err != nil {
+			return nil, err
+		}
+		// append 子命令
+		cmd.Append("GET")
+
+		// encoding
+		_ = buf.WriteByte(op.EncodingPrefix)
+		_, _ = buf.WriteString(strconv.FormatInt(op.Encoding, 10))
+		cmd.Append(buf.String())
+		buf.Reset()
+
+		// 偏移量是否有前缀
+		if op.OffsetPrefix != 0 {
+			_ = buf.WriteByte(op.OffsetPrefix)
+		}
+		_, _ = buf.WriteString(strconv.FormatInt(op.Offset, 10))
+		cmd.Append(buf.String())
+		buf.Reset()
+	}
+	innerBytes.Put(buf)
+
+	return c.sendCommand(cmd.Bytes())
+}
+
 // BitField v3.2.0后可用
 // 命令格式: BITFIELD key GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment [ GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment ...]
 // 时间复杂度: O(1)对于每个指定的子命令
 // 返回值类型: 该命令返回一个数组，其中每个条目是在同一位置给出的子命令的相应结果。 OVERFLOW 子命令不计为生成回复
-func (c *Client) BitField(key string, arguments ...interface{}) (*Reply, error) {
+func (c *Client) BitField(key string, opts ...*bitmap.FieldOption) (*Reply, error) {
 	cmd := args.Get()
+	defer args.Put(cmd)
+
 	cmd.Append("BITFIELD", key)
-	cmd.AppendArgs(arguments...)
-	cmdBytes := cmd.Bytes()
-	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	buf := innerBytes.Get()
+	for _, op := range opts {
+		if err := op.Check(false); err != nil {
+			return nil, err
+		}
+
+		encoding, offset := "", ""
+		// 拼接encoding
+		_ = buf.WriteByte(op.EncodingPrefix)
+		_, _ = buf.WriteString(strconv.FormatInt(op.Encoding, 10))
+		encoding = buf.String()
+		buf.Reset()
+
+		// 拼接offset
+		if op.OffsetPrefix != 0 {
+			_ = buf.WriteByte(op.OffsetPrefix)
+		}
+		_, _ = buf.WriteString(strconv.FormatInt(op.Offset, 10))
+		offset = buf.String()
+		buf.Reset()
+
+		switch strings.ToUpper(op.SubCommand) {
+		case "GET":
+			cmd.Append(op.SubCommand, encoding, offset)
+		case "SET":
+			if op.Overflow != "" {
+				cmd.Append("OVERFLOW", op.Overflow)
+			}
+			cmd.Append(op.SubCommand, encoding, offset)
+			cmd.AppendArgs(op.Value)
+		case "INCRBY":
+			cmd.Append("INCRBY", encoding, offset)
+			cmd.AppendArgs(op.Increment)
+		default:
+			return nil, errors.New("BitField sub command option: GET, SET, INCRBY")
+		}
+		buf.Reset()
+	}
+	innerBytes.Put(buf)
+	return c.sendCommand(cmd.Bytes())
+}
+
+// BitFieldRo v6.2.0后可用
+// 命令格式: BITFIELD_RO key GET encoding offset [ encoding offset ...]
+// 时间复杂度: 每个子命令O(1)
+// BitField命令的只读版本
+// 返回值类型: Array, 没回每个子命令回复组成的数组, 子命令和回复的位置一一对应
+func (c *Client) BitFieldRo(key string, opts ...*bitmap.FieldRoOption) (*Reply, error) {
+	cmd := args.Get()
+	defer args.Put(cmd)
+
+	cmd.Append("BITFIELD_RO", key)
+
+	buf := innerBytes.Get()
+	for _, op := range opts {
+		if err := op.Check(); err != nil {
+			return nil, err
+		}
+
+		encoding, offset := "", ""
+		_ = buf.WriteByte(op.EncodingPrefix)
+		_, _ = buf.WriteString(strconv.FormatInt(op.Encoding, 10))
+		encoding = buf.String()
+		buf.Reset()
+
+		if op.OffsetPrefix != 0 {
+			_ = buf.WriteByte(op.OffsetPrefix)
+		}
+		_, _ = buf.WriteString(strconv.FormatInt(op.Offset, 10))
+		offset = buf.String()
+		buf.Reset()
+
+		cmd.Append("GET", encoding, offset)
+	}
+	innerBytes.Put(buf)
+	return c.sendCommand(cmd.Bytes())
 }
 
 // BitOp v2.6.0后可用
@@ -62,9 +182,15 @@ func (c *Client) BitField(key string, arguments ...interface{}) (*Reply, error) 
 func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
+
 	cmd.Append("BITOP")
 	switch strings.ToUpper(op) {
-	case "AND", "OR", "XOR", "NOT":
+	case "NOT":
+		if len(keys) > 1 {
+			return nil, errors.New("NOT operation only support one input key")
+		}
+		fallthrough
+	case "AND", "OR", "XOR":
 		cmd.Append(op, dst)
 	default:
 		return nil, ErrInvalidArgumentFormat
@@ -134,7 +260,7 @@ func (c *Client) GetBit(key string, offset int64) (*Reply, error) {
 // 该位根据值设置或清除，值可以是 0 或 1
 // 当key不存在时, 创建一个新的字符串: 字符串被增长以确保它可以在偏移量处设置值。偏移量参数必须大于或等于0, 并且小于2^32(这将位图限制为512MB); 当key处的字符串增长时, 添加的位设置为0
 // 返回值类型: Integer, 返回存储在offset的原始bit值
-func (c *Client) SetBit(key string, offset int64, value int64) (*Reply, error) {
+func (c *Client) SetBit(key string, offset int64, value uint8) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SETBIT", key)
 	cmd.AppendArgs(offset, value)

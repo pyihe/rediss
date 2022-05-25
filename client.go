@@ -2,7 +2,6 @@ package rediss
 
 import (
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/pyihe/go-pkg/serialize"
@@ -76,31 +75,19 @@ func (c *Client) connect() (*conn, error) {
 	}
 	connection := newConn(rConn)
 	if len(c.password) > 0 {
-		cmd := args.Get()
-		defer args.Put(cmd)
-
-		cmd.Append("AUTH", c.password)
-		_, err = connection.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
+		_, err = connection.writeCommand(args.Command("AUTH", c.password), c.writeTimeout, c.readTimeout)
 		if err != nil {
 			return nil, err
 		}
 	}
-	cmd := args.Get()
-	defer args.Put(cmd)
-
-	cmd.Append("SELECT", strconv.FormatInt(int64(c.database), 10))
-	_, err = connection.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
+	_, err = connection.writeCommand(args.Command("SELECT", c.database), c.writeTimeout, c.readTimeout)
 	return connection, err
 }
 
 func (c *Client) popConn() (conn *conn, isNew bool, err error) {
 	if conn = <-c.connPool; conn != nil {
-		cmd := args.Get()
-		defer args.Put(cmd)
-
-		cmd.Append("PING")
-		_, err = conn.writeCommand(cmd.Bytes(), c.writeTimeout, c.readTimeout)
-		if err != nil {
+		_, err = conn.writeCommand(args.Command("PING"), c.writeTimeout, c.readTimeout)
+		if err == nil {
 			return
 		}
 	}
