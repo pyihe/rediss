@@ -2,6 +2,7 @@ package rediss
 
 import (
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/pyihe/go-pkg/serialize"
@@ -9,11 +10,11 @@ import (
 )
 
 type Client struct {
+	poolSize     int                  // 连接池大小
 	address      string               // redis地址
 	username     string               // 用户名
 	password     string               // 密码
-	database     int                  // db索引
-	poolSize     int                  // 连接池大小
+	database     int32                // db索引
 	writeTimeout time.Duration        // 每次发送请求的超时时间
 	readTimeout  time.Duration        // 每次读取回复的超时时间
 	serializer   serialize.Serializer // 序列化
@@ -80,7 +81,7 @@ func (c *Client) connect() (*conn, error) {
 			return nil, err
 		}
 	}
-	_, err = connection.writeCommand(args.Command("SELECT", c.database), c.writeTimeout, c.readTimeout)
+	_, err = connection.writeCommand(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout)
 	return connection, err
 }
 
@@ -88,7 +89,10 @@ func (c *Client) popConn() (conn *conn, isNew bool, err error) {
 	if conn = <-c.connPool; conn != nil {
 		_, err = conn.writeCommand(args.Command("PING"), c.writeTimeout, c.readTimeout)
 		if err == nil {
-			return
+			_, err = conn.writeCommand(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout)
+			if err == nil {
+				return
+			}
 		}
 	}
 	isNew = true

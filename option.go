@@ -28,7 +28,7 @@ func WithPassword(password string) Option {
 
 func WithDatabase(db int) Option {
 	return func(client *Client) {
-		client.database = db
+		client.database = int32(db)
 	}
 }
 

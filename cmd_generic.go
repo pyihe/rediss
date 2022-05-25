@@ -3,8 +3,8 @@ package rediss
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
 
-	"github.com/pyihe/go-pkg/maths"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/generic"
 )
@@ -56,7 +56,11 @@ func (c *Client) Select(database int) error {
 	args.Put(cmd)
 
 	_, err := c.sendCommand(cmdBytes)
-	return err
+	if err != nil {
+		return err
+	}
+	atomic.StoreInt32(&c.database, int32(database))
+	return nil
 }
 
 // Copy v6.2.0后可用
@@ -238,22 +242,24 @@ func (c *Client) ObjectRefCount(key string) (*Reply, error) {
 // 如果key早已经存在, RESTORE将会返回"Target key name is busy"的错误, 除非使用了REPLACE修饰符
 // RESTORE将会校验RDB版本和数据校验和, 如果不匹配将会返回错误
 // 返回值类型: Simple String, 成功返回OK
-func (c *Client) Restore(key string, ttl int64, value string, replace, absttl bool, idleTime, freq int64) (*Reply, error) {
+func (c *Client) Restore(key string, value string, option *generic.RestoreOption) (*Reply, error) {
+	if option == nil {
+		return nil, ErrEmptyOptionArgument
+	}
 	cmd := args.Get()
 	cmd.Append("RESTORE", key)
-	ttl = maths.MaxInt64(0, ttl)
-	cmd.AppendArgs(ttl, value)
-	if replace {
+	cmd.AppendArgs(option.TTL, value)
+	if option.Replace {
 		cmd.Append("REPLACE")
 	}
-	if absttl {
+	if option.ABSTTL {
 		cmd.Append("ABSTTL")
 	}
-	if idleTime > 0 {
-		cmd.AppendArgs("IDLETIME", idleTime)
+	if option.IdleTime > 0 {
+		cmd.AppendArgs("IDLETIME", option.IdleTime)
 	}
-	if freq > 0 {
-		cmd.AppendArgs("FREQ", freq)
+	if option.Freq > 0 {
+		cmd.AppendArgs("FREQ", option.Freq)
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
@@ -274,6 +280,12 @@ func (c *Client) Sort(key string, arguments ...interface{}) (*Reply, error) {
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	return c.sendCommand(cmdBytes)
+}
+
+func (c *Client) SortRo(key string, opt *generic.SortOption) (*Reply, error) {
+
+	// TODO
+	return nil, nil
 }
 
 // Touch v3.2.1后可用

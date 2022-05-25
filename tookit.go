@@ -8,7 +8,7 @@ import (
 	"github.com/pyihe/rediss/args"
 )
 
-func assertDatabase(db int) {
+func assertDatabase(db int32) {
 	if db < 0 || db > 15 {
 		panic("invalid database")
 	}
