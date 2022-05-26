@@ -52,11 +52,6 @@ func (c *conn) writeCommand(cmd []byte, writeTimeout, readTimeout time.Duration)
 }
 
 func (c *conn) reply(timeout time.Duration) (interface{}, error) {
-	if timeout > 0 {
-		if err := c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return nil, err
-		}
-	}
 	var head, err = c.readLine(timeout)
 	if err != nil {
 		return nil, err

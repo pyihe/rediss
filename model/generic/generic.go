@@ -23,13 +23,12 @@ type RestoreOption struct {
 }
 
 // SortOption SORT命令选项
-// TODO
 type SortOption struct {
-	Pattern string   // 需要排序的key匹配规则
+	Pattern string   // By选项值, 作为外部权重的key的匹配模式
 	Offset  int64    //
 	Count   int64    //
-	Get     []string //
-	Sort    string   // 排序规则
-	Alpha   bool
-	Store   string
+	Get     []string // 需要返回的元素匹配模式
+	Sort    string   // 排序规则: DESC, ASC
+	Alpha   bool     // 是否按照字典序排序
+	Store   string   // 是否将结果存储在store指定的key中
 }

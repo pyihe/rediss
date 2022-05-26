@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/generic"
 )
@@ -132,7 +133,7 @@ func (c *Client) Migrate(option *generic.MigrateOption) (*Reply, error) {
 
 	cmd.Append("MIGRATE", option.Host, option.Port)
 	if len(option.Keys) == 1 {
-		cmd.Append("KEY")
+		cmd.Append(option.Keys[0])
 	} else {
 		cmd.Append("")
 	}
@@ -273,19 +274,65 @@ func (c *Client) Restore(key string, value string, option *generic.RestoreOption
 // 返回值类型:
 // 1. 没有传递store参数, 返回排序后元素的列表
 // 2. 如果指明了store参数, 返回存储在dst列表中的元素数量
-func (c *Client) Sort(key string, arguments ...interface{}) (*Reply, error) {
+func (c *Client) Sort(key string, option *generic.SortOption) (*Reply, error) {
+	if option == nil {
+		return nil, ErrEmptyOptionArgument
+	}
 	cmd := args.Get()
 	cmd.Append("SORT", key)
-	cmd.AppendArgs(arguments...)
+	if option.Pattern != "" {
+		cmd.Append("BY", option.Pattern)
+	}
+	if option.Count > 0 && option.Offset >= 0 {
+		cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+	}
+	for _, get := range option.Get {
+		cmd.Append("GET", get)
+	}
+	if option.Sort != "" {
+		cmd.Append(option.Sort)
+	}
+	if option.Alpha {
+		cmd.Append("ALPHA")
+	}
+	if option.Store != "" {
+		cmd.Append("STORE", option.Store)
+	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	return c.sendCommand(cmdBytes)
 }
 
-func (c *Client) SortRo(key string, opt *generic.SortOption) (*Reply, error) {
+// SortRo v7.0.0后可用
+// Sort的只读版本
+func (c *Client) SortRo(key string, option *generic.SortOption) (*Reply, error) {
+	if option == nil {
+		return nil, ErrEmptyOptionArgument
+	}
+	if option.Store != "" {
+		return nil, errors.New("SORT_RO not support STORE argument")
+	}
+	cmd := args.Get()
+	cmd.Append("SORT_RO", key)
+	if option.Pattern != "" {
+		cmd.Append("BY", option.Pattern)
+	}
+	if option.Count > 0 && option.Offset >= 0 {
+		cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+	}
+	for _, get := range option.Get {
+		cmd.Append("GET", get)
+	}
+	if option.Sort != "" {
+		cmd.Append(option.Sort)
+	}
+	if option.Alpha {
+		cmd.Append("ALPHA")
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
 
-	// TODO
-	return nil, nil
+	return c.sendCommand(cmdBytes)
 }
 
 // Touch v3.2.1后可用
@@ -392,6 +439,7 @@ func (c *Client) Exists(keys ...string) (*Reply, error) {
 
 // Expire v1.0.0后可用
 // 命令格式: EXPIRE key seconds [ NX | XX | GT | LT]
+// v7.0.0开始支持NX, XX, GT, LT选项
 // 时间复杂度: O(1)
 // 设置key的有效期时间, 单位为秒
 // 超时时间只会被删除或者覆盖的命令清除, 比如DEL, SET, GETSET等
@@ -406,7 +454,6 @@ func (c *Client) Exists(keys ...string) (*Reply, error) {
 // LT: 仅在新到期时间小于当前到期时设置到期
 // 对于已经设置了timeout的key, EXPIRE将会返回0并且不会更改既有的timeout
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
-// v7.0.0开始支持NX, XX, GT, LT选项
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
 func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
@@ -429,6 +476,7 @@ func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
 
 // ExpireAt v1.2.0后可用
 // 命令格式: EXPIREAT key unix-time-seconds [ NX | XX | GT | LT]
+// v7.0.0开始支持NX, XX, GT, LT选项
 // 时间复杂度: O(1)
 // EXPIREAT与EXPIRE一样, 不同的是EXPIREAT设置的是时间戳
 // 选项:
@@ -437,7 +485,6 @@ func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
 // GT: 仅在新到期时间大于当前到期时间时设置到期时间
 // LT: 仅在新到期时间小于当前到期时设置到期
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
-// v7.0.0开始支持NX, XX, GT, LT选项
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
 func (c *Client) ExpireAt(key string, unix int64, op string) (*Reply, error) {
@@ -473,6 +520,7 @@ func (c *Client) ExpireTime(key string) (*Reply, error) {
 
 // PExpire v2.6.0后可用
 // 命令格式: PEXPIRE key milliseconds [ NX | XX | GT | LT]
+// v7.0.0开始支持NX, XX, GT, LT选项
 // 时间复杂度: O(1)
 // 设置key的过期时间, 单位为毫秒
 // NX: 只有当key没有过期时才设置过期时间
@@ -480,7 +528,6 @@ func (c *Client) ExpireTime(key string) (*Reply, error) {
 // GT: 仅在新到期时间大于当前到期时间时设置到期时间
 // LT: 仅在新到期时间小于当前到期时设置到期
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
-// v7.0.0开始支持NX, XX, GT, LT选项
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
 func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
@@ -502,6 +549,7 @@ func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
 
 // PExpireAt v2.6.0后可用
 // 命令格式: PEXPIREAT key unix-time-milliseconds [ NX | XX | GT | LT]
+// v7.0.0开始支持NX, XX, GT, LT选项
 // 时间复杂度: O(1)
 // 设置key的过期时间点, 时间点单位为毫秒
 // NX: 只有当key没有过期时才设置过期时间
@@ -509,7 +557,6 @@ func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
 // GT: 仅在新到期时间大于当前到期时间时设置到期时间
 // LT: 仅在新到期时间小于当前到期时设置到期
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
-// v7.0.0开始支持NX, XX, GT, LT选项
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
 func (c *Client) PExpireAt(key string, millUnix int64, op string) (*Reply, error) {
