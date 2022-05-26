@@ -1,6 +1,7 @@
 package rediss
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/pyihe/go-pkg/bytes"
@@ -39,7 +40,9 @@ func (r *Reply) GetString() (s string) {
 }
 
 func (r *Reply) GetBytes() []byte {
-	return r.value
+	b := make([]byte, len(r.value))
+	copy(b, r.value)
+	return b
 }
 
 func (r *Reply) GetInteger() (v int64, err error) {
@@ -59,4 +62,26 @@ func (r *Reply) Error() (err error) {
 
 func (r *Reply) Unmarshal(serializer serialize.Serializer, dst interface{}) error {
 	return serializer.Decode(r.value, dst)
+}
+
+// Just for test
+func (r *Reply) print(prefix string) {
+	if r == nil {
+		fmt.Printf("%s%v", prefix, r)
+		fmt.Println()
+		return
+	}
+	if err := r.Error(); err != nil {
+		fmt.Printf("%s%v", prefix, err)
+		fmt.Println()
+		return
+	}
+	if str := r.GetString(); str != "" {
+		fmt.Printf("%s%v", prefix, str)
+		fmt.Println()
+		return
+	}
+	for _, arr := range r.GetArray() {
+		arr.print(fmt.Sprintf("%v ", prefix))
+	}
 }

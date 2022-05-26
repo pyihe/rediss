@@ -18,10 +18,8 @@ github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/pyihe/go-pkg v0.0.0-20220428070919-6c88f85bed3b h1:kW8pZipTGK7/yPgs5lbiTcic36ChJRi/vg2dh5+UOi4=
-github.com/pyihe/go-pkg v0.0.0-20220428070919-6c88f85bed3b/go.mod h1:+rQd1raZGz3jJ1zHn3I57qoYgCfPzQ1zZQ/3IVya5ck=
-github.com/pyihe/go-pkg v0.0.0-20220513134724-111b1b19fd54 h1:lD5K+kf7/dfOaMtC+Uk2O2aPl0wK6PQLKlhaJ6pzYtc=
-github.com/pyihe/go-pkg v0.0.0-20220513134724-111b1b19fd54/go.mod h1:+rQd1raZGz3jJ1zHn3I57qoYgCfPzQ1zZQ/3IVya5ck=
+github.com/pyihe/go-pkg v0.0.0-20220526091214-2ae61155310d h1:RdEku7nDZ2X2Erbii+l6fcFC/sxO5fUr49dXxhvd6vk=
+github.com/pyihe/go-pkg v0.0.0-20220526091214-2ae61155310d/go.mod h1:+rQd1raZGz3jJ1zHn3I57qoYgCfPzQ1zZQ/3IVya5ck=
 github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
@@ -38,7 +36,6 @@ github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/goleak v1.1.10/go.mod h1:8a7PlsEVH3e/a/GLqe5IIrQx6GzcnRmZEufDUTk4A7A=
 go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9iU=
-go.uber.org/zap v1.18.1 h1:CSUJ2mjFszzEWt4CdKISEuChVIXGBn3lAPwkRGyVrc4=
 go.uber.org/zap v1.18.1/go.mod h1:xg/QME4nWcxGxrpdeYfq7UvYrLh66cuVKdrbD1XF/NI=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
