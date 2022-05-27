@@ -43,15 +43,17 @@ func New(opts ...Option) *Client {
 	return c
 }
 
-func (c *Client) sendCommand(cmd []byte) (result *Reply, err error) {
+func (c *Client) sendCommandWithoutTimeout(cmd []byte) (result *Reply, err error) {
 	conn, newConn, err := c.popConn()
 	if err != nil {
 		goto end
 	}
-	result, err = conn.writeCommand(cmd, c.writeTimeout, c.readTimeout)
+	_, err = conn.writeBytes(cmd, 0)
 	if err != nil {
 		goto end
 	}
+
+	result, err = conn.readReply(0)
 
 end:
 	if !newConn || (newConn && conn != nil) {
@@ -60,12 +62,22 @@ end:
 	return
 }
 
-func (c *Client) readReply(conn *conn) (result *Reply, err error) {
-	r, err := conn.reply(c.readTimeout)
+func (c *Client) sendCommand(cmd []byte) (result *Reply, err error) {
+	conn, newConn, err := c.popConn()
 	if err != nil {
-		return nil, err
+		goto end
 	}
-	result = parse(r)
+	_, err = conn.writeBytes(cmd, c.writeTimeout)
+	if err != nil {
+		goto end
+	}
+
+	result, err = conn.readReply(c.readTimeout)
+
+end:
+	if !newConn || (newConn && conn != nil) {
+		c.pushConn(conn)
+	}
 	return
 }
 
@@ -76,21 +88,20 @@ func (c *Client) connect() (*conn, error) {
 	}
 	connection := newConn(rConn)
 	if len(c.password) > 0 {
-		_, err = connection.writeCommand(args.Command("AUTH", c.password), c.writeTimeout, c.readTimeout)
-		if err != nil {
+		if _, err = connection.request(args.Command("AUTH", c.password), c.writeTimeout, c.readTimeout); err != nil {
 			return nil, err
 		}
 	}
-	_, err = connection.writeCommand(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout)
+	if _, err = connection.request(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout); err != nil {
+		return nil, err
+	}
 	return connection, err
 }
 
 func (c *Client) popConn() (conn *conn, isNew bool, err error) {
 	if conn = <-c.connPool; conn != nil {
-		_, err = conn.writeCommand(args.Command("PING"), c.writeTimeout, c.readTimeout)
-		if err == nil {
-			_, err = conn.writeCommand(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout)
-			if err == nil {
+		if _, err = conn.request(args.Command("PING"), c.writeTimeout, c.readTimeout); err == nil {
+			if _, err = conn.request(args.Command("SELECT", atomic.LoadInt32(&c.database)), c.writeTimeout, c.readTimeout); err == nil {
 				return
 			}
 		}

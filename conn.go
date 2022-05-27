@@ -2,6 +2,7 @@ package rediss
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"time"
 
@@ -37,16 +38,19 @@ func (c *conn) writeBytes(b []byte, timeout time.Duration) (n int, err error) {
 	return
 }
 
-func (c *conn) writeCommand(cmd []byte, writeTimeout, readTimeout time.Duration) (reply *Reply, err error) {
-	if _, err = c.writeBytes(cmd, writeTimeout); err != nil {
+func (c *conn) request(b []byte, writeTimeout, readTimeout time.Duration) (reply *Reply, err error) {
+	if _, err = c.writeBytes(b, writeTimeout); err != nil {
 		return
 	}
+	reply, err = c.readReply(readTimeout)
+	return
+}
 
-	response, err := c.reply(readTimeout)
+func (c *conn) readReply(timeout time.Duration) (reply *Reply, err error) {
+	response, err := c.reply(timeout)
 	if err != nil {
 		return
 	}
-
 	reply = parse(response)
 	return
 }
@@ -56,14 +60,14 @@ func (c *conn) reply(timeout time.Duration) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(head) == 0 {
-		return nil, errors.New("too short reply")
+	if isNilReply(head) {
+		return nil, nil
 	}
 	if isEmptyReply(head) {
 		return &Reply{}, nil
 	}
-	if isNilReply(head) {
-		return nil, nil
+	if len(head) == 0 {
+		return nil, errors.New("got empty reply from redis")
 	}
 	switch head[0] {
 	case '+', ':':
@@ -87,31 +91,32 @@ func (c *conn) reply(timeout time.Duration) (interface{}, error) {
 	}
 }
 
-func (c *conn) readLine(timeout time.Duration) (line []byte, err error) {
+func (c *conn) readLine(timeout time.Duration) ([]byte, error) {
 	if timeout > 0 {
-		if err = c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return
+		if err := c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
 		}
 	}
-	line, err = c.reader.ReadSlice('\n')
-	if err == bufio.ErrBufferFull {
-		buf := append([]byte{}, line...)
-		for err == bufio.ErrBufferFull {
-			line, err = c.reader.ReadSlice('\n')
-			buf = append(buf, line...)
-		}
-		line = buf
-	}
+	line, err := c.reader.ReadSlice('\n')
 	if err != nil {
-		return
+		if err != bufio.ErrBufferFull {
+			return nil, err
+		}
+		full := make([]byte, len(line))
+		copy(full, line)
+
+		line, err = c.reader.ReadBytes('\n')
+		if err != nil {
+			return nil, err
+		}
+		full = append(full, line...)
+		line = full
+	}
+	if len(line) <= 2 || line[len(line)-2] != '\r' || line[len(line)-1] != '\n' {
+		return nil, fmt.Errorf("read invalid reply: %q", line)
 	}
 
-	if n := len(line); n > 1 && line[n-2] == '\r' {
-		line = line[:n-2] // 去掉结尾的'\r\n'
-		return
-	}
-	err = ErrInvalidReplyFormat
-	return
+	return line[:len(line)-2], nil // 去掉结尾的'\r\n'
 }
 
 func (c *conn) readBulkString(head []byte, timeout time.Duration) ([]byte, error) {

@@ -15,15 +15,16 @@ import (
 // 函数参数说明:
 // src: 源队列, 移出元素的队列
 // dst: 目的队列, 元素push进的队列
-// fromTo: pop类型, LEFT|RIGHT LEFT|RIGHT
+// fromSide: pop类型: LEFT|RIGHT
+// toSide: push类型: LEFT|RIGHT
 // timeout: pop超时时间, 单位秒
-func (c *Client) BLMove(src, dst, fromTo string, timeout float64) (*Reply, error) {
+func (c *Client) BLMove(src, fromSide, dst, toSide string, timeout float64) (*Reply, error) {
 	cmd := args.Get()
-	cmd.Append("BLMOVE", src, dst, fromTo)
+	cmd.Append("BLMOVE", src, dst, fromSide, toSide)
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	return c.sendCommandWithoutTimeout(cmdBytes)
 }
 
 // BLMPop v7.0.0后可用

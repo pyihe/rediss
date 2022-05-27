@@ -15,8 +15,7 @@ func assertDatabase(db int32) {
 }
 
 func isNilReply(b []byte) bool {
-	n := len(b)
-	if n == 3 && (b[0] == '$' || b[0] == '*') && b[1] == '-' && b[2] == '1' {
+	if len(b) == 3 && (b[0] == '$' || b[0] == '*') && b[1] == '-' && b[2] == '1' {
 		return true
 	}
 	return false

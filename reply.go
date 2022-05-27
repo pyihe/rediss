@@ -230,12 +230,14 @@ func (reply *Reply) print(prefix string) {
 		fmt.Println()
 		return
 	}
-	if str := reply.GetString(); str != "" {
+	array := reply.GetArray()
+
+	if str := reply.GetString(); str != "" || len(array) == 0 {
 		fmt.Printf("%s%v", prefix, str)
 		fmt.Println()
 		return
 	}
-	for _, arr := range reply.GetArray() {
+	for _, arr := range array {
 		arr.print(fmt.Sprintf("%v ", prefix))
 	}
 }
