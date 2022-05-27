@@ -714,7 +714,7 @@ func (c *Client) RenameNX(key, newKey string) (*Reply, error) {
 // MATCH: 只迭代给定样式的元素
 // TYPE: 遍历的值类型, 如ZSET, GEOHASH
 // 返回值类型: Array, 返回遍历的key的数组
-func (c *Client) Scan(cursor int, pattern string, count int64, valueType string) (retCursor int64, keys []string, err error) {
+func (c *Client) Scan(cursor int, pattern string, count int64, valueType string) (result *generic.ScanResult, err error) {
 	cmd := args.Get()
 	cmd.Append("SCAN", strconv.FormatInt(int64(cursor), 10))
 	if pattern != "" {
@@ -730,18 +730,11 @@ func (c *Client) Scan(cursor int, pattern string, count int64, valueType string)
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil {
-		return 0, nil, err
+	if err != nil || reply == nil {
+		return nil, err
 	}
-	replyArray := reply.GetArray()
-	retCursor, _ = replyArray[0].GetInteger()
-	keysArray := replyArray[1].GetArray()
-	keys = make([]string, 0, len(keysArray))
 
-	for _, v := range keysArray {
-		keys = append(keys, v.GetString())
-	}
-	return retCursor, keys, nil
+	return reply.parseScanResult()
 }
 
 // Type v1.0.0后可用

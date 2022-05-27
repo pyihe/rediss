@@ -103,30 +103,11 @@ func (c *Client) GeoPos(key string, members ...string) ([]*geo.Location, error) 
 
 	// 获取回复
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
 
-	// 组装回复
-	result := make([]*geo.Location, len(members))
-	for i, arr := range reply.GetArray() {
-		switch {
-		case arr == nil:
-			result[i] = nil
-		default:
-			subArr := arr.GetArray()
-			result[i] = &geo.Location{
-				Name: members[i],
-			}
-			if result[i].Longitude, err = subArr[0].GetFloat(); err != nil {
-				return nil, err
-			}
-			if result[i].Latitude, err = subArr[1].GetFloat(); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return result, nil
+	return reply.parseGeoPosResult(members...)
 }
 
 // GeoRadiusRo v3.2.10后可用, v6.2.0后被视为废弃
@@ -174,10 +155,13 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *ge
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
-	return readLocation(reply, option), nil
+	if err = reply.Error(); err != nil {
+		return nil, err
+	}
+	return reply.parseGeoLocation(option)
 }
 
 // GeoRadius v3.2.0后可用, v6.2.0开始被视为废弃
@@ -250,11 +234,14 @@ func (c *Client) GeoRadius(key string, longitude, latitude float64, option *geo.
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	if err = reply.Error(); err != nil {
 		return nil, err
 	}
 
-	return readLocation(reply, option), nil
+	return reply.parseGeoLocation(option)
 }
 
 func (c *Client) GeoRadiusStore(key string, longitude, latitude float64, option *geo.RadiusOption) (*Reply, error) {
@@ -341,11 +328,13 @@ func (c *Client) GeoRadiusByMember(key, member string, option *geo.RadiusOption)
 		cmd.Append(option.Sort)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
-
-	return readLocation(reply, option), nil
+	if err = reply.Error(); err != nil {
+		return nil, err
+	}
+	return reply.parseGeoLocation(option)
 }
 
 func (c *Client) GeoRadiusByMemberStore(key, member string, option *geo.RadiusOption) (*Reply, error) {
@@ -424,11 +413,13 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *geo.RadiusOptio
 		cmd.Append(option.Sort)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
-
-	return readLocation(reply, option), nil
+	if err = reply.Error(); err != nil {
+		return nil, err
+	}
+	return reply.parseGeoLocation(option)
 }
 
 // GeoSearch v6.2.0后可用
@@ -501,11 +492,14 @@ func (c *Client) GeoSearch(key string, option *geo.SearchOption) ([]*geo.Locatio
 		cmd.Append(option.StoreDist)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil {
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	if err = reply.Error(); err != nil {
 		return nil, err
 	}
 
-	return readLocation(reply, option), nil
+	return reply.parseGeoLocation(option)
 }
 
 // GeoSearchStore v6.2.0后可用
@@ -568,68 +562,4 @@ func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (*Reply, e
 		cmd.Append(option.StoreDist)
 	}
 	return c.sendCommand(cmd.Bytes())
-}
-
-func readLocation(reply *Reply, option interface{}) (result []*geo.Location) {
-	array := reply.GetArray()
-	n := len(array)
-	if n == 0 {
-		return
-	}
-	var withDist, withHash, withCoord bool
-	switch opt := option.(type) {
-	case *geo.RadiusOption:
-		withDist, withHash, withCoord = opt.WithDist, opt.WithHash, opt.WithCoord
-	case *geo.SearchOption:
-		withDist, withHash, withCoord = opt.WithDist, opt.WithHash, opt.WithCoord
-	}
-
-	result = make([]*geo.Location, 0, n)
-	for _, arr := range reply.GetArray() {
-		// 如果每个点都是多元素组成的数组
-		subArr := arr.GetArray()
-		location := &geo.Location{}
-
-		switch len(subArr) {
-		case 0:
-			location.Name = arr.GetString()
-		case 1:
-		case 2:
-			location.Name = subArr[0].GetString()
-			if withDist {
-				location.Distance, _ = subArr[1].GetFloat()
-			}
-			if withHash {
-				location.GeoHash, _ = subArr[1].GetInteger()
-			}
-			if withCoord {
-				location.Longitude, _ = subArr[1].GetArray()[0].GetFloat()
-				location.Latitude, _ = subArr[1].GetArray()[1].GetFloat()
-			}
-		case 3:
-			location.Name = subArr[0].GetString()
-			if !withCoord {
-				location.Distance, _ = subArr[1].GetFloat()
-				location.GeoHash, _ = subArr[2].GetInteger()
-			}
-			if !withHash {
-				location.Distance, _ = subArr[1].GetFloat()
-				location.Longitude, _ = subArr[2].GetArray()[0].GetFloat()
-				location.Latitude, _ = subArr[2].GetArray()[1].GetFloat()
-			}
-			if !withDist {
-				location.GeoHash, _ = subArr[1].GetInteger()
-				location.Longitude, _ = subArr[2].GetArray()[0].GetFloat()
-				location.Latitude, _ = subArr[2].GetArray()[1].GetFloat()
-			}
-		case 4:
-			location.Name = subArr[0].GetString()
-			location.Distance, _ = subArr[1].GetFloat()
-			location.GeoHash, _ = subArr[2].GetInteger()
-			location.Longitude, _ = subArr[3].GetArray()[0].GetFloat()
-			location.Latitude, _ = subArr[3].GetArray()[1].GetFloat()
-		}
-		result = append(result, location)
-	}
-	return
 }

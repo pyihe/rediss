@@ -60,18 +60,13 @@ func (c *Client) HGetAll(key string) (hash.FieldValue, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
-
-	fvs := hash.NewFieldValue()
-	fieldArray := reply.GetArray()
-	for i := 0; i < len(fieldArray)-1; i += 2 {
-		field := fieldArray[i].GetString()
-		value := fieldArray[i+1].GetBytes()
-		fvs.Set(field, value)
+	if err = reply.Error(); err != nil {
+		return nil, err
 	}
-	return fvs, nil
+	return reply.parseHGetAllResult()
 }
 
 // HIncrBy v2.0.0后可用
@@ -185,28 +180,13 @@ func (c *Client) HRandField(key string, count int64, withValues bool) (hash.Fiel
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil {
+	if err != nil || reply == nil {
 		return nil, err
 	}
-	result := hash.NewFieldValue()
-	switch count {
-	case 0:
-		result.Set(reply.GetString(), nil)
-	default:
-		array := reply.GetArray()
-		if withValues {
-			for i := 0; i < len(array)-1; i += 2 {
-				field := array[i].GetString()
-				value := array[i+1].GetBytes()
-				result.Set(field, value)
-			}
-		} else {
-			for _, k := range array {
-				result.Set(k.GetString(), nil)
-			}
-		}
+	if err = reply.Error(); err != nil {
+		return nil, err
 	}
-	return result, nil
+	return reply.parseHRandFieldResult(count, withValues)
 }
 
 // HScan v2.8.0后可用
@@ -214,7 +194,7 @@ func (c *Client) HRandField(key string, count int64, withValues bool) (hash.Fiel
 // 时间复杂度: O(N), 每次调用O(1), O(N)用于完整的迭代，包括足够的命令调用以使光标返回0; N是集合内的元素数。
 // 递增的遍历hash的字段以及对应的值
 // 返回值类型: Array, 数组元素为包含两个元素, 字段和字段值
-func (c *Client) HScan(key string, cursor int, pattern string, count int64) (retCursor int64, fvs hash.FieldValue, err error) {
+func (c *Client) HScan(key string, cursor int, pattern string, count int64) (result *hash.ScanResult, err error) {
 	cmd := args.Get()
 	cmd.Append("HSCAN", key, strconv.FormatInt(int64(cursor), 10))
 	if pattern != "" {
@@ -227,19 +207,13 @@ func (c *Client) HScan(key string, cursor int, pattern string, count int64) (ret
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil {
-		return 0, nil, err
+	if err != nil || reply == nil {
+		return
 	}
-	replyArray := reply.GetArray()
-	fvs = hash.NewFieldValue()
-	retCursor, _ = replyArray[0].GetInteger()
-	fvArray := replyArray[1].GetArray()
-	for i := 0; i < len(fvArray)-1; i += 2 {
-		field := fvArray[i].GetString()
-		value := fvArray[i+1].GetBytes()
-		fvs.Set(field, value)
+	if err = reply.Error(); err != nil {
+		return
 	}
-	return retCursor, fvs, nil
+	return reply.parseHScanResult()
 }
 
 // HSet v2.0.0后可用

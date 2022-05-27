@@ -32,3 +32,11 @@ type SortOption struct {
 	Alpha   bool     // 是否按照字典序排序
 	Store   string   // 是否将结果存储在store指定的key中
 }
+
+/*****************************Result*************************************/
+
+// ScanResult SCAN命令的结果
+type ScanResult struct {
+	Cursor int64
+	Keys   []string
+}
