@@ -714,17 +714,19 @@ func (c *Client) RenameNX(key, newKey string) (*Reply, error) {
 // MATCH: 只迭代给定样式的元素
 // TYPE: 遍历的值类型, 如ZSET, GEOHASH
 // 返回值类型: Array, 返回遍历的key的数组
-func (c *Client) Scan(cursor int, pattern string, count int64, valueType string) (result *generic.ScanResult, err error) {
+func (c *Client) Scan(cursor int, option *generic.ScanOption) (result *generic.ScanResult, err error) {
 	cmd := args.Get()
 	cmd.Append("SCAN", strconv.FormatInt(int64(cursor), 10))
-	if pattern != "" {
-		cmd.Append("MATCH", pattern)
-	}
-	if count > 0 {
-		cmd.AppendArgs("COUNT", count)
-	}
-	if valueType != "" {
-		cmd.Append("TYPE", valueType)
+	if option != nil {
+		if option.Match != "" {
+			cmd.Append("MATCH", option.Match)
+		}
+		if option.Count > 0 {
+			cmd.AppendArgs("COUNT", option.Count)
+		}
+		if option.Type != "" {
+			cmd.Append("TYPE", option.Type)
+		}
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)

@@ -6,6 +6,13 @@ import (
 	"github.com/pyihe/go-pkg/errors"
 )
 
+// BitOption BITCOUNT命令选项
+type BitOption struct {
+	Start int64
+	End   int64
+	Unit  string
+}
+
 // FieldOption BITFIELD命令选项
 type FieldOption struct {
 	SubCommand     string // 子命令类型: GET, SET, INCRBY

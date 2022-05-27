@@ -1,5 +1,12 @@
 package generic
 
+// ScanOption SCAN命令选项
+type ScanOption struct {
+	Match string
+	Count int64
+	Type  string
+}
+
 // MigrateOption 迁移key
 type MigrateOption struct {
 	Host        string   // 目标Redis服务器主机

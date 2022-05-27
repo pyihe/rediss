@@ -20,22 +20,18 @@ import (
 // 不存在的key将被视为空字符串, 命令将会返回0
 // 默认情况下, 附加参数start和end指定字节索引; 我们可以使用附加参数BIT来指定位索引
 // 返回值类型: Integer, 被设置为1的位的数量
-func (c *Client) BitCount(key string, start, end int64, unit string) (*Reply, error) {
+func (c *Client) BitCount(key string, option *bitmap.BitOption) (*Reply, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
 	cmd.Append("BITCOUNT", key)
-	if start != 0 && end != 0 {
-		cmd.AppendArgs(start, end)
-		switch strings.ToUpper(unit) {
-		case "BYTE", "BIT":
-			cmd.Append(unit)
-		case "":
-			break
-		default:
-			return nil, ErrInvalidArgumentFormat
+	if option != nil {
+		cmd.AppendArgs(option.Start, option.End)
+		if option.Unit != "" {
+			cmd.Append(option.Unit)
 		}
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	return c.sendCommand(cmdBytes)
 }
 
 // BitFieldGet v3.2.0后可用
@@ -215,23 +211,18 @@ func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 // 如果我们寻找清除位(位参数为 0)并且字符串仅包含设置为1的位, 则该函数返回第一个位而不是右侧字符串的一部分。因此如果字符串是三个字节设置为值 0xff, 则命令BITPOS键0将返回24, 因为直到第23位所有位都是1
 // 基本上, 如果您查找清除位并且不指定范围或仅指定开始参数, 该函数会将字符串的右侧视为用零填充
 // 但是, 如果您正在寻找清除位并指定包含开始和结束的范围, 则此行为会发生变化。如果在指定范围内没有找到清除位, 则函数返回-1, 因为用户指定了一个清除范围并且该范围内没有0位
-func (c *Client) BitPos(key string, bit int64, start, end int64, unit string) (*Reply, error) {
+func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
 	cmd.Append("BITPOS", key)
 	cmd.AppendArgs(bit)
-	if start != 0 {
-		cmd.AppendArgs(start)
-		if end != 0 {
-			cmd.AppendArgs(end)
-			switch strings.ToUpper(unit) {
-			case "BYTE", "BIT":
-				cmd.Append(unit)
-			case "":
-				break
-			default:
-				return nil, ErrInvalidArgumentFormat
+	if option != nil {
+		cmd.AppendArgs(option.Start)
+		if option.End != 0 {
+			cmd.AppendArgs(option.End)
+			if option.Unit != "" {
+				cmd.Append(option.Unit)
 			}
 		}
 	}
