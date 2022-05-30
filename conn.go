@@ -7,7 +7,6 @@ import (
 	"time"
 
 	innerBytes "github.com/pyihe/go-pkg/bytes"
-	"github.com/pyihe/go-pkg/errors"
 )
 
 type conn struct {
@@ -56,32 +55,26 @@ func (c *conn) readReply(timeout time.Duration) (reply *Reply, err error) {
 }
 
 func (c *conn) reply(timeout time.Duration) (interface{}, error) {
-	var head, err = c.readLine(timeout)
+	var line, err = c.readLine(timeout)
 	if err != nil {
 		return nil, err
 	}
-	if isNilReply(head) {
+	if isNilReply(line) {
 		return nil, nil
 	}
-	if isEmptyReply(head) {
-		return &Reply{}, nil
-	}
-	if len(head) == 0 {
-		return nil, errors.New("got empty reply from redis")
-	}
-	switch head[0] {
+	switch line[0] {
 	case '+', ':':
-		return newReply(head[1:]), nil
+		return newReply(line[1:]), nil
 	case '-':
-		return newReply(nil, innerBytes.String(head[1:])), nil
+		return newReply(nil, innerBytes.String(line[1:])), nil
 	case '$':
-		bulkString, err := c.readBulkString(head, timeout)
+		bulkString, err := c.readBulkString(line, timeout)
 		if err != nil {
 			return nil, err
 		}
 		return newReply(bulkString), nil
 	case '*':
-		array, err := c.readArray(head, timeout)
+		array, err := c.readArray(line, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -123,9 +116,6 @@ func (c *conn) readBulkString(head []byte, timeout time.Duration) ([]byte, error
 	count, err := dataLen(head[1:])
 	if err != nil {
 		return nil, err
-	}
-	if count <= 0 {
-		return nil, nil
 	}
 	buf := make([]byte, count+2)
 	if timeout > 0 {
