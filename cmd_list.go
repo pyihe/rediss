@@ -3,6 +3,7 @@ package rediss
 import (
 	"github.com/pyihe/go-pkg/maths"
 	"github.com/pyihe/rediss/args"
+	"github.com/pyihe/rediss/model/list"
 )
 
 // BLMove v6.2.0后可用
@@ -41,7 +42,7 @@ func (c *Client) BLMove(src, fromSide, dst, toSide string, timeout float64) (*Re
 // keys: pop元素的list
 // from: LEFT|RIGHT
 // count: pop的元素个数(可选参数)
-func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64) (*Reply, error) {
+func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64) (*list.MPopResult, error) {
 	cmd := args.Get()
 	cmd.Append("BLMPOP")
 	cmd.AppendArgs(timeout, len(keys))
@@ -52,7 +53,11 @@ func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseMPopResult()
 }
 
 // BLPop v2.0.0后可用
@@ -65,14 +70,19 @@ func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64
 // 函数参数说明:
 // keys: 从哪些list pop元素
 // timeout: 超时时间
-func (c *Client) BLPop(keys []string, timeout float64) (*Reply, error) {
+func (c *Client) BLPop(keys []string, timeout float64) (*list.BPopResult, error) {
 	cmd := args.Get()
 	cmd.Append("BLPOP")
 	cmd.Append(keys...)
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseBPopResult()
 }
 
 // BRPop v2.0.0后可用
@@ -84,14 +94,20 @@ func (c *Client) BLPop(keys []string, timeout float64) (*Reply, error) {
 // 2. 一个双元素数组, 第一个元素是list的名称, 第二个元素是由该list的元素组成的数组
 // keys: 从哪些队列pop元素
 // timeout: 超时时间
-func (c *Client) BRPop(keys []string, timeout float64) (*Reply, error) {
+func (c *Client) BRPop(keys []string, timeout float64) (*list.BPopResult, error) {
 	cmd := args.Get()
 	cmd.Append("BRPOP")
 	cmd.Append(keys...)
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseBPopResult()
 }
 
 // BRPopLPush v2.2.0后可用, v6.2.0后废弃
@@ -110,7 +126,7 @@ func (c *Client) BRPopLPush(src, dst string, timeout float64) (*Reply, error) {
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	return c.sendCommandWithoutTimeout(cmdBytes)
 }
 
 // LIndex v1.0.0后可用
@@ -139,12 +155,12 @@ func (c *Client) LIndex(key string, index int64) (*Reply, error) {
 // 返回值类型: Integer, 返回插入元素后的列表长度, 如果没有找到基准元素返回-1
 // 函数参数说明:
 // key: 需要insert的队列
-// to: BEFORE|AFTER
+// pos: BEFORE|AFTER
 // pivot: 基准值
 // element: 插入的元素值
-func (c *Client) LInsert(key string, to string, pivot, element interface{}) (*Reply, error) {
+func (c *Client) LInsert(key string, pos string, pivot, element interface{}) (*Reply, error) {
 	cmd := args.Get()
-	cmd.Append("LINSERT", key, to)
+	cmd.Append("LINSERT", key, pos)
 	cmd.AppendArgs(pivot, element)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
@@ -173,10 +189,11 @@ func (c *Client) LLen(key string) (*Reply, error) {
 // 函数参数说明:
 // src: 源队列
 // dst: 目的队列
-// fromTo: LEFT|RIGHT LEFT|RIGHT
-func (c *Client) LMove(src, dst, fromTo string) (*Reply, error) {
+// from: LEFT|RIGHT
+// to: LEFT|RIGHT
+func (c *Client) LMove(src, dst, from, to string) (*Reply, error) {
 	cmd := args.Get()
-	cmd.Append("LMOVE", src, dst, fromTo)
+	cmd.Append("LMOVE", src, dst, from, to)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	return c.sendCommand(cmdBytes)
@@ -195,7 +212,7 @@ func (c *Client) LMove(src, dst, fromTo string) (*Reply, error) {
 // keys: 提供的key
 // from: LEFT|RIGHT
 // count: 需要pop的元素个数, 默认为1
-func (c *Client) LMPop(keys []string, from string, count int64) (*Reply, error) {
+func (c *Client) LMPop(keys []string, from string, count int64) (*list.MPopResult, error) {
 	cmd := args.Get()
 	cmd.Append("LMPOP")
 	cmd.AppendArgs(len(keys))
@@ -206,7 +223,12 @@ func (c *Client) LMPop(keys []string, from string, count int64) (*Reply, error) 
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseMPopResult()
 }
 
 // LPop v1.0.0后可用
@@ -218,7 +240,7 @@ func (c *Client) LMPop(keys []string, from string, count int64) (*Reply, error) 
 // 1. 当没有count参数时: Bulk String, 返回第一个元素的值, 如果key不存在则返回nil
 // 2. 当有count参数时: Array, 返回pop的元素数组, 如果key不存在返回nil
 // v6.2.0开始支持count参数
-func (c *Client) LPop(key string, count int64) (*Reply, error) {
+func (c *Client) LPop(key string, count int64) ([]string, error) {
 	cmd := args.Get()
 	cmd.Append("LPOP", key)
 	if count > 1 {
@@ -226,7 +248,13 @@ func (c *Client) LPop(key string, count int64) (*Reply, error) {
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parsePopResult()
 }
 
 // LPos v6.0.6后可用
@@ -242,25 +270,32 @@ func (c *Client) LPop(key string, count int64) (*Reply, error) {
 // 函数参数说明:
 // key: 指定队列
 // element: 需要匹配的元素
-// rank: RANK参数选项, 指定返回匹配到的第几个元素位置
+// rank: RANK参数选项, 在匹配到的元素中返回第RANK个元素
 // count: COUNT参数选项, -1表示不带COUNT选项, 0表示返回所有匹配成功的元素位置, 其余表示返回COUNT个匹配结果
 // maxLen: MAXLEN参数选项, -1表示不带MAXLEN选项, 0表示比较完所有的元素, 其余表示只做MAXLEN次比较
-func (c *Client) LPos(key string, element interface{}, rank, count, maxLen int64) (*Reply, error) {
+func (c *Client) LPos(key string, element interface{}, option *list.PosOption) ([]int64, error) {
 	cmd := args.Get()
 	cmd.Append("LPOS", key)
 	cmd.AppendArgs(element)
-	if rank != 0 {
-		cmd.AppendArgs("RANK", rank)
-	}
-	if count >= 0 {
-		cmd.AppendArgs("COUNT", count)
-	}
-	if maxLen >= 0 {
-		cmd.AppendArgs("MAXLEN", maxLen)
+	if option != nil {
+		if option.Rank != 0 {
+			cmd.AppendArgs("RANK", option.Rank)
+		}
+		if option.Count >= 0 {
+			cmd.AppendArgs("COUNT", option.Count)
+		}
+		if option.MaxLen >= 0 {
+			cmd.AppendArgs("MAXLEN", option.MaxLen)
+		}
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseLPosResult()
 }
 
 // LPush v1.0.0后可用
@@ -366,14 +401,19 @@ func (c *Client) LTrim(key string, start, stop int64) (*Reply, error) {
 // 返回值类型:
 // 1. 当没有指定count参数时: 返回最后一个元素的值, key不存在时返回nil
 // 2. 当指定count参数时: 返回一个pop的元素的列表, key不存在时返回nil
-func (c *Client) RPop(key string, count int64) (*Reply, error) {
+func (c *Client) RPop(key string, count int64) ([]string, error) {
 	cmd := args.Get()
 	cmd.Append("RPOP", key)
 	count = maths.MaxInt64(1, count)
 	cmd.AppendArgs(count)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parsePopResult()
 }
 
 // RPopLPush v1.2.0后可用, v6.2.0后废弃

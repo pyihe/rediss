@@ -23,11 +23,27 @@ func newConn(c net.Conn) *conn {
 	}
 }
 
-func (c *conn) writeBytes(b []byte, timeout time.Duration) (n int, err error) {
+func (c *conn) setReadTimeout(timeout time.Duration) (err error) {
 	if timeout > 0 {
-		if err = c.c.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-			return
-		}
+		err = c.c.SetReadDeadline(time.Now().Add(timeout))
+	} else {
+		err = c.c.SetReadDeadline(time.Time{})
+	}
+	return
+}
+
+func (c *conn) setWriteTimeout(timeout time.Duration) (err error) {
+	if timeout > 0 {
+		err = c.c.SetWriteDeadline(time.Now().Add(timeout))
+	} else {
+		err = c.c.SetWriteDeadline(time.Time{})
+	}
+	return
+}
+
+func (c *conn) writeBytes(b []byte, timeout time.Duration) (n int, err error) {
+	if err = c.setWriteTimeout(timeout); err != nil {
+		return
 	}
 	n, err = c.writer.Write(b)
 	if err != nil {
@@ -85,10 +101,8 @@ func (c *conn) reply(timeout time.Duration) (interface{}, error) {
 }
 
 func (c *conn) readLine(timeout time.Duration) ([]byte, error) {
-	if timeout > 0 {
-		if err := c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return nil, err
-		}
+	if err := c.setReadTimeout(timeout); err != nil {
+		return nil, err
 	}
 	line, err := c.reader.ReadSlice('\n')
 	if err != nil {
@@ -118,10 +132,8 @@ func (c *conn) readBulkString(head []byte, timeout time.Duration) ([]byte, error
 		return nil, err
 	}
 	buf := make([]byte, count+2)
-	if timeout > 0 {
-		if err = c.c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return nil, err
-		}
+	if err = c.setReadTimeout(timeout); err != nil {
+		return nil, err
 	}
 	if _, err = c.reader.Read(buf); err != nil {
 		return nil, err
@@ -135,7 +147,7 @@ func (c *conn) readArray(head []byte, timeout time.Duration) (interface{}, error
 		return nil, err
 	}
 	if count <= 0 {
-		return nil, nil
+		return &Reply{}, nil
 	}
 
 	var array = make([]interface{}, count)

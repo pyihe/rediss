@@ -10,6 +10,7 @@ import (
 	"github.com/pyihe/rediss/model/generic"
 	"github.com/pyihe/rediss/model/geo"
 	"github.com/pyihe/rediss/model/hash"
+	"github.com/pyihe/rediss/model/list"
 )
 
 // Reply load parsed reply from redis server
@@ -214,6 +215,66 @@ func (reply *Reply) parseHGetAllResult() (result hash.FieldValue, err error) {
 		field := fieldArray[i].GetString()
 		value := fieldArray[i+1].GetBytes()
 		result.Set(field, value)
+	}
+	return
+}
+
+func (reply *Reply) parseMPopResult() (result *list.MPopResult, err error) {
+	array := reply.GetArray()
+	result = &list.MPopResult{
+		Key: array[0].GetString(),
+	}
+	elementsArray := array[1].GetArray()
+	result.Elements = make([]string, 0, len(elementsArray))
+	for _, v := range elementsArray {
+		result.Elements = append(result.Elements, v.GetString())
+	}
+	return
+}
+
+func (reply *Reply) parseBPopResult() (result *list.BPopResult, err error) {
+	array := reply.GetArray()
+	result = &list.BPopResult{
+		Key:     array[0].GetString(),
+		Element: array[1].GetString(),
+	}
+	return
+}
+
+func (reply *Reply) parsePopResult() (result []string, err error) {
+	array := reply.GetArray()
+	switch len(array) {
+	case 0:
+		result = make([]string, 1)
+		result[0] = reply.GetString()
+	default:
+		result = make([]string, 0, len(array))
+		for _, v := range array {
+			result = append(result, v.GetString())
+		}
+	}
+	return
+}
+
+func (reply *Reply) parseLPosResult() (result []int64, err error) {
+	array := reply.GetArray()
+	switch len(array) {
+	case 0:
+		result = make([]int64, 0, 1)
+		pos, err := reply.GetInteger()
+		if err != nil {
+			return result, err
+		}
+		result = append(result, pos)
+	default:
+		result = make([]int64, 0, len(array))
+		for _, v := range array {
+			pos, err := v.GetInteger()
+			if err != nil {
+				return result, err
+			}
+			result = append(result, pos)
+		}
 	}
 	return
 }
