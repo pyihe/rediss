@@ -1,6 +1,9 @@
 package rediss
 
-import "github.com/pyihe/rediss/args"
+import (
+	"github.com/pyihe/rediss/args"
+	"github.com/pyihe/rediss/model/set"
+)
 
 // SAdd v1.0.0后可用
 // 命令格式: SADD key member [member ...]
@@ -9,13 +12,19 @@ import "github.com/pyihe/rediss/args"
 // 如果key存在并且值类型不为set, 将会返回一个错误
 // 返回值类型: Integer, 最终添加的成员数量, 不包含已经存在的成员
 // v2.4.0后开始支持接收多个成员参数
-func (c *Client) SAdd(key string, members ...interface{}) (*Reply, error) {
+func (c *Client) SAdd(key string, members ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SADD", key)
 	cmd.AppendArgs(members...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+
+	return reply.Integer()
 }
 
 // SCard v1.0.0后可用
@@ -23,12 +32,17 @@ func (c *Client) SAdd(key string, members ...interface{}) (*Reply, error) {
 // 时间复杂度: O(1)
 // 返回存储在key指定集合的成员数量
 // 返回值类型: Integer, 返回成员数量, 如果key不存在返回0
-func (c *Client) SCard(key string) (*Reply, error) {
+func (c *Client) SCard(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SCARD", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SDiff v1.0.0后可用
@@ -50,13 +64,18 @@ func (c *Client) SDiff(keys ...string) (*Reply, error) {
 // 时间复杂度: O(N), N为所有set的成员总数
 // 获取第一个key对应的set和其他key对应的set之间不同成员构成的set, 并将结果set的值存储进dst中, 如果dst已经存在, 命令将会覆盖其旧值
 // 返回值类型: Integer, 返回差异集合的成员数量
-func (c *Client) SDiffStore(dst string, keys ...string) (*Reply, error) {
+func (c *Client) SDiffStore(dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SDIFFSTORE", dst)
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SInter v1.0.0后可用
@@ -81,7 +100,7 @@ func (c *Client) SInter(keys ...string) (*Reply, error) {
 // 如果key不存在, set将会被视为空, 交集也将为空
 // 如果提供了LIMIT(默认为0, 表示无限制)选项,
 // 返回值类型: Integer, 返回结果set的元素数量
-func (c *Client) SInterCard(keys []string, limit int64) (*Reply, error) {
+func (c *Client) SInterCard(keys []string, limit int64) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SINTERCARD")
 	cmd.AppendArgs(len(keys))
@@ -91,7 +110,12 @@ func (c *Client) SInterCard(keys []string, limit int64) (*Reply, error) {
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SInterStore v1.0.0后可用
@@ -100,13 +124,18 @@ func (c *Client) SInterCard(keys []string, limit int64) (*Reply, error) {
 // 与SINTER命令一样, SINTERSTORE也是获取多个set的交集, 不同的是SINTERSTORE会将交集存储在指定的key中
 // 如果dst已经存在, SINTERSTORE将会覆盖其旧值
 // 返回值类型: 返回结果集合的元素数量
-func (c *Client) SInterStore(dst string, keys ...string) (*Reply, error) {
+func (c *Client) SInterStore(dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SINTERSTORE", dst)
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SIsMember v1.0.0后可用
@@ -114,13 +143,19 @@ func (c *Client) SInterStore(dst string, keys ...string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 判断member是否是key对应的集合的成员
 // 返回值类型: Integer, 如果是返回1, 如果不是或者key不存在则返回0
-func (c *Client) SIsMember(key string, member interface{}) (*Reply, error) {
+func (c *Client) SIsMember(key string, member interface{}) (bool, error) {
 	cmd := args.Get()
 	cmd.Append("SISMEMBER", key)
 	cmd.AppendArgs(member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+
+	return reply.Bool()
 }
 
 // SMembers v1.0.0后可用
@@ -141,13 +176,18 @@ func (c *Client) SMembers(key string) (*Reply, error) {
 // 时间复杂度: O(N), N为被检查的元素数量
 // 判断members中的每个值是否都是key对应set的成员
 // 返回值类型: Array, 按照提供的成员顺序返回每个成员的校验结果, 如果是set的成员返回1, 不是或者key不存在时返回0
-func (c *Client) SMIsMember(key string, members ...interface{}) (*Reply, error) {
+func (c *Client) SMIsMember(key string, members ...interface{}) ([]bool, error) {
 	cmd := args.Get()
 	cmd.Append("SMISMEMBER", key)
 	cmd.AppendArgs(members...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseIsMember()
 }
 
 // SMove v1.0.0后可用
@@ -158,13 +198,19 @@ func (c *Client) SMIsMember(key string, members ...interface{}) (*Reply, error) 
 // 否则成员将会从源集合移动到目标集合, 如果成员已经存在于目标集合, 命令将只会从源集合中移除成员
 // 如果源集合或者目标集合所持有的数据类型不是集合, 将会返回一个错误
 // 返回值类型: Integer, 移动成功返回1, 如果源集合不包含指定成员没有操作被执行时返回0
-func (c *Client) SMove(src, dst string, member interface{}) (*Reply, error) {
+func (c *Client) SMove(src, dst string, member interface{}) (bool, error) {
 	cmd := args.Get()
 	cmd.Append("SMOVE", src, dst)
 	cmd.AppendArgs(member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+
+	return reply.Bool()
 }
 
 // SPop v1.0.0后可用
@@ -188,6 +234,7 @@ func (c *Client) SPop(key string, count int64) (*Reply, error) {
 
 // SRandMember v1.0.0后可用
 // 命令格式: SRANDMEMBER key [count]
+// v2.6.0后开始支持count参数
 // 时间复杂度: 没有指定count参数时为O(1), 否则为O(N), N为count参数
 // 当没有提供count参数时, 将从key指定的集合中随机返回一个元素
 // count > 0: 1. 返回的元素中没有重复的值
@@ -199,7 +246,6 @@ func (c *Client) SPop(key string, count int64) (*Reply, error) {
 // 返回值类型:
 // 没有count参数: Bulk String, 返回随机的成员, 如果key不存在时返回nil
 // 有count参数: Array, 返回随机的成员列表, 如果key不存在返回空数组
-// v2.6.0后开始支持count参数
 func (c *Client) SRandMember(key string, count int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SRANDMEMBER", key)
@@ -218,32 +264,45 @@ func (c *Client) SRandMember(key string, count int64) (*Reply, error) {
 // 如果key所持有的数据类型不是集合, 将会返回一个错误
 // 返回值类型: Integer, 集合被删除的元素个数
 // v2.4.0开始支持多个成员参数
-func (c *Client) SRem(key string, members ...interface{}) (*Reply, error) {
+func (c *Client) SRem(key string, members ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SREM", key)
 	cmd.AppendArgs(members...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SScan v2.8.0后可用
 // 命令格式: SSCAN key cursor [MATCH pattern] [COUNT count]
 // 时间复杂度: O(N), N为scan结果中元素数量
 // 返回值类型: Array, 数组的元素为集合的成员
-func (c *Client) SScan(key string, cursor int64, pattern string, count int64) (*Reply, error) {
+func (c *Client) SScan(key string, cursor int64, option *set.ScanOption) (*set.ScanResult, error) {
 	cmd := args.Get()
 	cmd.Append("SSCAN", key)
 	cmd.AppendArgs(cursor)
-	if pattern != "" {
-		cmd.Append("MATCH", pattern)
-	}
-	if count > 0 {
-		cmd.AppendArgs("COUNT", count)
+	if option != nil {
+		if option.Match != "" {
+			cmd.Append("MATCH", option.Match)
+		}
+		if option.Count > 0 {
+			cmd.AppendArgs("COUNT", option.Count)
+		}
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseSScanResult()
 }
 
 // SUnion v1.0.0后可用
@@ -266,11 +325,16 @@ func (c *Client) SUnion(keys ...string) (*Reply, error) {
 // 与SUNION一样, 获取集合的并集, 不同的是SUNIONSTORE会将并集存储在dst指向的集合中
 // 如果dst已经存在, SUNIONSTORE会将其旧值覆盖
 // 返回值类型: Integer, 返回存储后dst的成员数量
-func (c *Client) SUnionStore(dst string, keys ...string) (*Reply, error) {
+func (c *Client) SUnionStore(dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SUNIONSTORE", dst)
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
