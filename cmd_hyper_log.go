@@ -11,13 +11,18 @@ import "github.com/pyihe/rediss/args"
 // 如果指定的key不存在, 该命令会自动创建一个空的HyperLogLog结构(即指定长度和给定编码的Redis String)
 // 调用不带元素但仅变量名有效的命令, 如果变量已存在则不执行任何操作, 或者如果键不存在则仅创建数据结构(在后一种情况下返回1)
 // 返回值类型: Integer
-func (c *Client) PFAdd(key string, elements ...interface{}) (*Reply, error) {
+func (c *Client) PFAdd(key string, elements ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("PFADD", key)
 	cmd.AppendArgs(elements...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // PFCount v2.8.9后可用
@@ -27,13 +32,18 @@ func (c *Client) PFAdd(key string, elements ...interface{}) (*Reply, error) {
 // 当使用多个键调用时, 通过内部将存储在提供的key处的HyperLogLogs合并到临时HyperLogLog中, 返回传递的HyperLogLogs联合的近似基数
 // 可以使用HyperLogLog数据结构来计算集合中的唯一元素, 只需使用少量的恒定内存, 特别是每个HyperLogLog12k字节(加上键本身的几个字节)
 // 返回值类型: Integer, 返回通过PFADD观察到的唯一元素的近似数量
-func (c *Client) PFCount(keys ...string) (*Reply, error) {
+func (c *Client) PFCount(keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("PFCOUNT")
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // PFMerge v2.8.9后可用
@@ -42,11 +52,16 @@ func (c *Client) PFCount(keys ...string) (*Reply, error) {
 // 将多个HyperLogLog值合并为一个唯一值, 该值将近似于观察到的源HyperLogLog结构集的并集的基数
 // 如果目标变量存在, 则将其视为源集之一, 其基数将包含在计算的HyperLogLog的基数中
 // 返回值类型: Simple String
-func (c *Client) PFMerge(dst string, srcs ...string) (*Reply, error) {
+func (c *Client) PFMerge(dst string, srcs ...string) (string, error) {
 	cmd := args.Get()
 	cmd.Append("PFMERGE", dst)
 	cmd.Append(srcs...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }

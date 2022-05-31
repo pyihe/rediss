@@ -35,13 +35,17 @@ func (reply *Reply) Array() []*Reply {
 	return reply.array
 }
 
-func (reply *Reply) ToString() (s string) {
+func (reply *Reply) ValueString() (s string) {
 	s = bytes.String(reply.value)
 	return
 }
 
 func (reply *Reply) Bool() (b bool, err error) {
-	return strconv.ParseBool(reply.ToString())
+	if reply.ValueString() == "OK" {
+		b = true
+		return
+	}
+	return strconv.ParseBool(reply.ValueString())
 }
 
 func (reply *Reply) Bytes() []byte {
@@ -82,7 +86,7 @@ func (reply *Reply) parseScanResult() (result *generic.ScanResult, err error) {
 	}
 	result.Cursor, _ = array[0].Integer()
 	for _, k := range keysArray {
-		result.Keys = append(result.Keys, k.ToString())
+		result.Keys = append(result.Keys, k.ValueString())
 	}
 	return
 }
@@ -110,10 +114,10 @@ func (reply *Reply) parseGeoLocation(option interface{}) (result []*geo.Location
 
 		switch len(subArr) {
 		case 0:
-			location.Name = arr.ToString()
+			location.Name = arr.ValueString()
 		case 1:
 		case 2:
-			location.Name = subArr[0].ToString()
+			location.Name = subArr[0].ValueString()
 			if withDist {
 				location.Distance, _ = subArr[1].Float()
 			}
@@ -125,7 +129,7 @@ func (reply *Reply) parseGeoLocation(option interface{}) (result []*geo.Location
 				location.Latitude, _ = subArr[1].Array()[1].Float()
 			}
 		case 3:
-			location.Name = subArr[0].ToString()
+			location.Name = subArr[0].ValueString()
 			if !withCoord {
 				location.Distance, _ = subArr[1].Float()
 				location.GeoHash, _ = subArr[2].Integer()
@@ -141,13 +145,22 @@ func (reply *Reply) parseGeoLocation(option interface{}) (result []*geo.Location
 				location.Latitude, _ = subArr[2].Array()[1].Float()
 			}
 		case 4:
-			location.Name = subArr[0].ToString()
+			location.Name = subArr[0].ValueString()
 			location.Distance, _ = subArr[1].Float()
 			location.GeoHash, _ = subArr[2].Integer()
 			location.Longitude, _ = subArr[3].Array()[0].Float()
 			location.Latitude, _ = subArr[3].Array()[1].Float()
 		}
 		result = append(result, location)
+	}
+	return
+}
+
+func (reply *Reply) parseGeoHashResult() (result []string, err error) {
+	array := reply.Array()
+	result = make([]string, 0, len(array))
+	for _, v := range array {
+		result = append(result, v.ValueString())
 	}
 	return
 }
@@ -182,8 +195,8 @@ func (reply *Reply) parseHScanResult() (result *hash.ScanResult, err error) {
 	result = &hash.ScanResult{FieldValues: hash.NewFieldValue()}
 	result.Cursor, _ = array[0].Integer()
 	for i := 0; i < len(fvArray)-1; i += 2 {
-		field := fvArray[i].ToString()
-		value := fvArray[i+1].ToString()
+		field := fvArray[i].ValueString()
+		value := fvArray[i+1].ValueString()
 		result.FieldValues.Set(field, value)
 	}
 	return
@@ -194,18 +207,18 @@ func (reply *Reply) parseHRandFieldResult(count int64, withValues bool) (result 
 	result = hash.NewFieldValue()
 	switch count {
 	case 0:
-		result.Set(reply.ToString(), nil)
+		result.Set(reply.ValueString(), nil)
 	default:
 		array := reply.Array()
 		if withValues {
 			for i := 0; i < len(array)-1; i += 2 {
-				field := array[i].ToString()
+				field := array[i].ValueString()
 				value := array[i+1].Bytes()
 				result.Set(field, value)
 			}
 		} else {
 			for _, k := range array {
-				result.Set(k.ToString(), nil)
+				result.Set(k.ValueString(), nil)
 			}
 		}
 	}
@@ -217,7 +230,7 @@ func (reply *Reply) parseHGetAllResult() (result hash.FieldValue, err error) {
 	result = hash.NewFieldValue()
 	var fieldArray = reply.Array()
 	for i := 0; i < len(fieldArray)-1; i += 2 {
-		field := fieldArray[i].ToString()
+		field := fieldArray[i].ValueString()
 		value := fieldArray[i+1].Bytes()
 		result.Set(field, value)
 	}
@@ -227,12 +240,12 @@ func (reply *Reply) parseHGetAllResult() (result hash.FieldValue, err error) {
 func (reply *Reply) parseMPopResult() (result *list.MPopResult, err error) {
 	array := reply.Array()
 	result = &list.MPopResult{
-		Key: array[0].ToString(),
+		Key: array[0].ValueString(),
 	}
 	elementsArray := array[1].Array()
 	result.Elements = make([]string, 0, len(elementsArray))
 	for _, v := range elementsArray {
-		result.Elements = append(result.Elements, v.ToString())
+		result.Elements = append(result.Elements, v.ValueString())
 	}
 	return
 }
@@ -240,8 +253,8 @@ func (reply *Reply) parseMPopResult() (result *list.MPopResult, err error) {
 func (reply *Reply) parseBPopResult() (result *list.BPopResult, err error) {
 	array := reply.Array()
 	result = &list.BPopResult{
-		Key:     array[0].ToString(),
-		Element: array[1].ToString(),
+		Key:     array[0].ValueString(),
+		Element: array[1].ValueString(),
 	}
 	return
 }
@@ -251,11 +264,11 @@ func (reply *Reply) parsePopResult() (result []string, err error) {
 	switch len(array) {
 	case 0:
 		result = make([]string, 1)
-		result[0] = reply.ToString()
+		result[0] = reply.ValueString()
 	default:
 		result = make([]string, 0, len(array))
 		for _, v := range array {
-			result = append(result, v.ToString())
+			result = append(result, v.ValueString())
 		}
 	}
 	return
@@ -288,7 +301,7 @@ func (reply *Reply) parseIsMember() (result []bool, err error) {
 	array := reply.Array()
 	result = make([]bool, len(array))
 	for i, v := range array {
-		result[i] = v.ToString() == "1"
+		result[i] = v.ValueString() == "1"
 	}
 	return
 }
@@ -299,7 +312,25 @@ func (reply *Reply) parseSScanResult() (result *set.ScanResult, err error) {
 	result.Cursor, err = array[0].Integer()
 	result.Members = make([]string, 0, len(array[1].Array()))
 	for _, v := range array[1].Array() {
-		result.Members = append(result.Members, v.ToString())
+		result.Members = append(result.Members, v.ValueString())
+	}
+	return
+}
+
+func (reply *Reply) parseKeysResult() (result []string, err error) {
+	array := reply.Array()
+	result = make([]string, 0, len(array))
+	for _, v := range array {
+		result = append(result, v.ValueString())
+	}
+	return
+}
+
+func (reply *Reply) parseHKeysResult() (result []string, err error) {
+	array := reply.Array()
+	result = make([]string, 0, len(array))
+	for _, v := range array {
+		result = append(result, v.ValueString())
 	}
 	return
 }
@@ -318,7 +349,7 @@ func (reply *Reply) print(prefix string) {
 	}
 	array := reply.Array()
 
-	if str := reply.ToString(); str != "" || len(array) == 0 {
+	if str := reply.ValueString(); str != "" || len(array) == 0 {
 		fmt.Printf("%s%v", prefix, str)
 		fmt.Println()
 		return

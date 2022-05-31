@@ -25,9 +25,9 @@ import (
 // 返回值类型: Integer
 // 如果没有指定可选参数, 返回添加的新元素数量
 // 如果指定了CH选项, 返回添加或者更新的元素数量
-func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error) {
+func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (int64, error) {
 	if len(members) == 0 {
-		return nil, errors.New("GEOADD need pass member arguments at least one")
+		return 0, errors.New("GEOADD need pass member arguments at least one")
 	}
 
 	cmd := args.Get()
@@ -40,13 +40,18 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return 0, ErrInvalidArgumentFormat
 	}
 
 	for _, me := range members {
 		cmd.AppendArgs(me.Longitude, me.Latitude, me.Name)
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // GeoDist v3.2.0后可用
@@ -60,7 +65,7 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (*Reply, error
 // MI: 单位英里
 // FT: 单位英尺
 // 返回值类型: Bulk String, 返回nil或者双精度浮点数的距离
-func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Reply, error) {
+func (c *Client) GeoDist(key string, member1, member2 string, unit string) (float64, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -71,9 +76,14 @@ func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Rep
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return 0, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Float()
 }
 
 // GeoHash v3.2.0后可用
@@ -81,11 +91,16 @@ func (c *Client) GeoDist(key string, member1, member2 string, unit string) (*Rep
 // 时间复杂度: 对于每个请求的成员复杂度为: O(log(N)), 其中N为有序集合中的元素数量
 // 返回一个或者多个地理位置的有效GeoHash字符串
 // 返回值类型: Array
-func (c *Client) GeoHash(key string, members ...string) (*Reply, error) {
+func (c *Client) GeoHash(key string, members ...string) ([]string, error) {
 	cmd := args.Get()
 	cmd.Append("GEOHASH", key)
 	cmd.Append(members...)
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseGeoHashResult()
 }
 
 // GeoPos v3.2.0后可用
@@ -509,12 +524,12 @@ func (c *Client) GeoSearch(key string, option *geo.SearchOption) ([]*geo.Locatio
 // 返回值类型: Array,
 // 没有指定任何WITH选项, 命令只返回一个线性数组
 // 如果指定了WITHCOORD, WITHDIST或者WITHHASH选项, 命令返回由数组组成的数组, 每个子数组元素代表一个返回项
-func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (*Reply, error) {
+func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (int64, error) {
 	if option == nil {
-		return nil, ErrEmptyOptionArgument
+		return 0, ErrEmptyOptionArgument
 	}
 	if option.StoreDist == "" {
-		return nil, errors.New("GeoSearchStore need STOREDIST argument")
+		return 0, errors.New("GeoSearchStore need STOREDIST argument")
 	}
 	cmd := args.Get()
 	defer args.Put(cmd)
@@ -561,5 +576,10 @@ func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (*Reply, e
 	if option.StoreDist != "" {
 		cmd.Append(option.StoreDist)
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }

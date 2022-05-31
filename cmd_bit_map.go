@@ -20,7 +20,7 @@ import (
 // 不存在的key将被视为空字符串, 命令将会返回0
 // 默认情况下, 附加参数start和end指定字节索引; 我们可以使用附加参数BIT来指定位索引
 // 返回值类型: Integer, 被设置为1的位的数量
-func (c *Client) BitCount(key string, option *bitmap.BitOption) (*Reply, error) {
+func (c *Client) BitCount(key string, option *bitmap.BitOption) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("BITCOUNT", key)
 	if option != nil {
@@ -31,7 +31,12 @@ func (c *Client) BitCount(key string, option *bitmap.BitOption) (*Reply, error) 
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // BitFieldGet v3.2.0后可用
@@ -175,7 +180,7 @@ func (c *Client) BitFieldRo(key string, opts ...*bitmap.FieldRoOption) (*Reply, 
 // 操作的结果总是存放在destkey
 // 当在具有不同长度的字符串之间执行操作时，所有比集合中最长字符串短的字符串都被视为补零直到最长字符串的长度
 // 返回值类型: Integer, 存储在目标键中的字符串的大小，即等于最长输入字符串的大小
-func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
+func (c *Client) BitOp(op, dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -183,16 +188,21 @@ func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 	switch strings.ToUpper(op) {
 	case "NOT":
 		if len(keys) > 1 {
-			return nil, errors.New("NOT operation only support one input key")
+			return 0, errors.New("NOT operation only support one input key")
 		}
 		fallthrough
 	case "AND", "OR", "XOR":
 		cmd.Append(op, dst)
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return 0, ErrInvalidArgumentFormat
 	}
 	cmd.Append(keys...)
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // BitPos v2.8.7后可用
@@ -211,7 +221,7 @@ func (c *Client) BitOp(op, dst string, keys ...string) (*Reply, error) {
 // 如果我们寻找清除位(位参数为 0)并且字符串仅包含设置为1的位, 则该函数返回第一个位而不是右侧字符串的一部分。因此如果字符串是三个字节设置为值 0xff, 则命令BITPOS键0将返回24, 因为直到第23位所有位都是1
 // 基本上, 如果您查找清除位并且不指定范围或仅指定开始参数, 该函数会将字符串的右侧视为用零填充
 // 但是, 如果您正在寻找清除位并指定包含开始和结束的范围, 则此行为会发生变化。如果在指定范围内没有找到清除位, 则函数返回-1, 因为用户指定了一个清除范围并且该范围内没有0位
-func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (*Reply, error) {
+func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (int64, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -226,7 +236,11 @@ func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (*Reply
 			}
 		}
 	}
-	return c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // GetBit v2.2.0后可用
@@ -235,13 +249,18 @@ func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (*Reply
 // 返回存储在 key 的字符串值中偏移处的位值
 // 当offset超过字符串长度时, 字符串被假定为一个0位的连续空间; 当key不存在时, 它被假定为一个空字符串, 因此偏移量总是超出范围, 并且该值也被假定为一个0位的连续空间
 // 返回值类型: Integer, 返回offset处的位值
-func (c *Client) GetBit(key string, offset int64) (*Reply, error) {
+func (c *Client) GetBit(key string, offset int64) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("GETBIT", key)
 	cmd.AppendArgs(offset)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // SetBit v2.2.0后可用
@@ -251,11 +270,16 @@ func (c *Client) GetBit(key string, offset int64) (*Reply, error) {
 // 该位根据值设置或清除，值可以是 0 或 1
 // 当key不存在时, 创建一个新的字符串: 字符串被增长以确保它可以在偏移量处设置值。偏移量参数必须大于或等于0, 并且小于2^32(这将位图限制为512MB); 当key处的字符串增长时, 添加的位设置为0
 // 返回值类型: Integer, 返回存储在offset的原始bit值
-func (c *Client) SetBit(key string, offset int64, value uint8) (*Reply, error) {
+func (c *Client) SetBit(key string, offset int64, value uint8) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("SETBIT", key)
 	cmd.AppendArgs(offset, value)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }

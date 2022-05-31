@@ -70,7 +70,7 @@ func (c *Client) Select(database int) error {
 // 将src的值拷贝到dst中, 默认情况下dst在src所在的DB中创建, 但DB选项为dst提供了创建的目标数据库;
 // 如果dst已经存在将会返回一个错误, 指定REPLACE选项后, 将会在拷贝前移除dst的值
 // 返回值类型: Integer, 如果拷贝成功返回1, 否则返回0
-func (c *Client) Copy(src, dst string, dstDB int, replace bool) (*Reply, error) {
+func (c *Client) Copy(src, dst string, dstDB int, replace bool) (bool, error) {
 	cmd := args.Get()
 	cmd.Append("COPY", src, dst)
 	cmd.AppendArgs("DB", dstDB)
@@ -79,7 +79,12 @@ func (c *Client) Copy(src, dst string, dstDB int, replace bool) (*Reply, error) 
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // Migrate v2.6.0后可用
@@ -124,9 +129,9 @@ func (c *Client) Copy(src, dst string, dstDB int, replace bool) (*Reply, error) 
 // copy: 是否添加COPY选项,
 // replace: 是否添加REPLACE选项
 // username, password: 用户名, 密码, 对于AUTH选项, 只需要提供password, 如果需要使用AUTH2则需要提供username
-func (c *Client) Migrate(option *generic.MigrateOption) (*Reply, error) {
+func (c *Client) Migrate(option *generic.MigrateOption) (string, error) {
 	if option == nil {
-		return nil, ErrEmptyOptionArgument
+		return "", ErrEmptyOptionArgument
 	}
 	cmd := args.Get()
 	defer args.Put(cmd)
@@ -155,7 +160,12 @@ func (c *Client) Migrate(option *generic.MigrateOption) (*Reply, error) {
 		cmd.Append("KEYS")
 		cmd.Append(option.Keys...)
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // ObjectEncoding v2.2.3后可用
@@ -169,12 +179,17 @@ func (c *Client) Migrate(option *generic.MigrateOption) (*Reply, error) {
 // 4. 哈希可以编码为ziplist或hashtable; ziplist是一种用于小散列的特殊编码
 // 5. 有序集合可以编码为ziplist或skiplist格式, 对于List类型的小有序集合可以使用ziplist进行特殊编码; 而skiplist编码适用于任何大小的排序集
 // 返回值类型: Bulk String, 返回编码结果, 如果key不存在返回nil
-func (c *Client) ObjectEncoding(key string) (*Reply, error) {
+func (c *Client) ObjectEncoding(key string) (string, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "ENCODING", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // ObjectFreq v4.0.0后可用
@@ -183,12 +198,17 @@ func (c *Client) ObjectEncoding(key string) (*Reply, error) {
 // 此命令返回存储在 <key> 的 Redis 对象的对数访问频率计数器
 // 该命令仅在 maxmemory-policy 配置指令设置为 LFU 策略之一时可用
 // 返回值类型: Integer, 返回计数器值
-func (c *Client) ObjectFreq(key string) (*Reply, error) {
+func (c *Client) ObjectFreq(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "FREQ", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ObjectHelp v6.2.0后可用
@@ -210,12 +230,17 @@ func (c *Client) ObjectHelp() (*Reply, error) {
 // 此命令返回自上次访问存储在 <key> 中的值以来的时间(以秒为单位)
 // 该命令仅在 maxmemory-policy 配置指令未设置为 LFU 策略之一时可用
 // 返回值类型: Integer, 以秒为单位返回时间
-func (c *Client) ObjectIdleTime(key string) (*Reply, error) {
+func (c *Client) ObjectIdleTime(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "IDLETIME", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ObjectRefCount v2.2.3后可用
@@ -223,12 +248,17 @@ func (c *Client) ObjectIdleTime(key string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 此命令返回存储在 <key> 处值的引用计数
 // 返回值类型: Integer, 返回值被引用的数
-func (c *Client) ObjectRefCount(key string) (*Reply, error) {
+func (c *Client) ObjectRefCount(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "REFCOUNT", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Restore v2.6.0后可用
@@ -243,9 +273,9 @@ func (c *Client) ObjectRefCount(key string) (*Reply, error) {
 // 如果key早已经存在, RESTORE将会返回"Target key name is busy"的错误, 除非使用了REPLACE修饰符
 // RESTORE将会校验RDB版本和数据校验和, 如果不匹配将会返回错误
 // 返回值类型: Simple String, 成功返回OK
-func (c *Client) Restore(key string, value string, option *generic.RestoreOption) (*Reply, error) {
+func (c *Client) Restore(key string, value string, option *generic.RestoreOption) (string, error) {
 	if option == nil {
-		return nil, ErrEmptyOptionArgument
+		return "", ErrEmptyOptionArgument
 	}
 	cmd := args.Get()
 	cmd.Append("RESTORE", key)
@@ -264,7 +294,12 @@ func (c *Client) Restore(key string, value string, option *generic.RestoreOption
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // Sort v1.0.0后可用
@@ -340,13 +375,18 @@ func (c *Client) SortRo(key string, option *generic.SortOption) (*Reply, error) 
 // 时间复杂度: O(N), N为keys的数量
 // 更改key的最后访问时间; 如果键不存在, 则忽略它
 // 返回值类型: 被修改的key的数量
-func (c *Client) Touch(keys ...string) (*Reply, error) {
+func (c *Client) Touch(keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("TOUCH")
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Unlink v4.0.0后可用
@@ -355,13 +395,18 @@ func (c *Client) Touch(keys ...string) (*Reply, error) {
 // 此命令与DEL非常相似: 它删除指定的key; 就像DEL一样, 如果一个key不存在, 它就会被忽略。
 // 但是该命令在不同的线程中执行实际的内存回收, 因此它不是阻塞的, 而DEL是。这就是命令名称的来源: 该命令只是将key与key空间取消链接。实际的删除将在稍后异步发生
 // 返回值类型: Integer, 被删除的key的数量
-func (c *Client) Unlink(keys ...string) (*Reply, error) {
+func (c *Client) Unlink(keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("UNLINK")
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Wait v3.0.0后可用
@@ -375,13 +420,18 @@ func (c *Client) Unlink(keys ...string) (*Reply, error) {
 // 3. timeout为0时意味着永久阻塞
 // 4. 由于 WAIT 返回在失败和成功的情况下达到的副本数, 客户端应检查返回的值是否等于或大于它要求的复制级别
 // 返回值类型: Integer, 该命令返回在当前连接的上下文中执行的所有写入所达到的副本数
-func (c *Client) Wait(numRep int64, timeout int64) (*Reply, error) {
+func (c *Client) Wait(numRep int64, timeout int64) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("WAIT")
 	cmd.AppendArgs(numRep, timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Del v1.0.0后可用
@@ -390,13 +440,18 @@ func (c *Client) Wait(numRep int64, timeout int64) (*Reply, error) {
 // 移除一个存储string类型的key的复杂度为O(1)
 // 移除指定的key, 当key不存在时, 将会被忽略
 // 返回值类型: Integer, 返回被移除的key的数量
-func (c *Client) Del(keys ...string) (*Reply, error) {
+func (c *Client) Del(keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("DEL")
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Dump v2.6.0后可用
@@ -410,7 +465,7 @@ func (c *Client) Del(keys ...string) (*Reply, error) {
 // 序列化值不包含过期信息; 为了捕获当前值的生存时间, 应使用PTTL命令
 // 如果key不存在, 返回nil。否则返回序列化之后的值
 // 返回值类型: Bulk String, 序列化值
-func (c *Client) Dump(key string) (*Reply, error) {
+func (c *Client) Dump(key string) (string, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("DUMP", key)
 	cmdBytes := cmd.Bytes()
@@ -418,8 +473,9 @@ func (c *Client) Dump(key string) (*Reply, error) {
 	reply, err := c.sendCommand(cmdBytes)
 	if reply == nil && err == nil {
 		err = ErrKeyNotExists
+		return "", err
 	}
-	return reply, err
+	return reply.ValueString(), err
 }
 
 // Exists v1.0.0后可用
@@ -428,13 +484,18 @@ func (c *Client) Dump(key string) (*Reply, error) {
 // 判断key是否存在
 // 用户应该知道, 如果在参数中多次提到相同的现有key, 它将被计算多次; 所以如果somekey存在, EXISTS somekey somekey将返回2
 // 返回值类型: Integer, 返回提供的key中存在的数量
-func (c *Client) Exists(keys ...string) (*Reply, error) {
+func (c *Client) Exists(keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("EXISTS")
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Expire v1.0.0后可用
@@ -456,7 +517,7 @@ func (c *Client) Exists(keys ...string) (*Reply, error) {
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
-func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
+func (c *Client) Expire(key string, sec int64, op string) (bool, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -468,10 +529,14 @@ func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return false, ErrInvalidArgumentFormat
 	}
 
-	return c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // ExpireAt v1.2.0后可用
@@ -487,7 +552,7 @@ func (c *Client) Expire(key string, sec int64, op string) (*Reply, error) {
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
-func (c *Client) ExpireAt(key string, unix int64, op string) (*Reply, error) {
+func (c *Client) ExpireAt(key string, unix int64, op string) (bool, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 	cmd.Append("PEXPIREAT", key)
@@ -498,9 +563,14 @@ func (c *Client) ExpireAt(key string, unix int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return false, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // ExpireTime v7.0.0后可用
@@ -510,12 +580,17 @@ func (c *Client) ExpireAt(key string, unix int64, op string) (*Reply, error) {
 // 返回值类型: Integer, 返回key过期的时间戳, 负数标识错误:
 // 1. key存在但没有设置过期时间时返回-1
 // 2. key不存在返回-2
-func (c *Client) ExpireTime(key string) (*Reply, error) {
+func (c *Client) ExpireTime(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("EXPIRETIME", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // PExpire v2.6.0后可用
@@ -530,7 +605,7 @@ func (c *Client) ExpireTime(key string) (*Reply, error) {
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
-func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
+func (c *Client) PExpire(key string, millSec int64, op string) (bool, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -542,9 +617,14 @@ func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return false, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // PExpireAt v2.6.0后可用
@@ -559,7 +639,7 @@ func (c *Client) PExpire(key string, millSec int64, op string) (*Reply, error) {
 // 返回值类型: Integer, 如果设置成功返回1, 设置失败返回0(比如key不存在, 因为参数而跳过操作)
 // 函数参数说明:
 // op: [NX|XX|GT|LT]
-func (c *Client) PExpireAt(key string, millUnix int64, op string) (*Reply, error) {
+func (c *Client) PExpireAt(key string, millUnix int64, op string) (bool, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -571,9 +651,13 @@ func (c *Client) PExpireAt(key string, millUnix int64, op string) (*Reply, error
 	case "":
 		break
 	default:
-		return nil, ErrInvalidArgumentFormat
+		return false, ErrInvalidArgumentFormat
 	}
-	return c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // PExpireTime v7.0.0后可用
@@ -583,12 +667,17 @@ func (c *Client) PExpireAt(key string, millUnix int64, op string) (*Reply, error
 // 返回值类型: 返回key过期的时间戳, 负数标识错误:
 // 1. key存在但没有设置过期时间时返回-1
 // 2. key不存在返回-2
-func (c *Client) PExpireTime(key string) (*Reply, error) {
+func (c *Client) PExpireTime(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("PEXPIRETIME", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // Keys v1.0.0后可用
@@ -596,12 +685,17 @@ func (c *Client) PExpireTime(key string) (*Reply, error) {
 // 时间复杂度: O(N), N为数据库中的key数量
 // 返回所有符合给定模式pattern的key
 // 返回值类型: Array, 匹配到的key的数组
-func (c *Client) Keys(pattern string) (*Reply, error) {
+func (c *Client) Keys(pattern string) ([]string, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("KEYS", pattern)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseKeysResult()
 }
 
 // Move v1.0.0后可用
@@ -609,12 +703,17 @@ func (c *Client) Keys(pattern string) (*Reply, error) {
 // 时间复杂度: O(1)
 //用于将当前数据库指定的key移动到给定的数据库中
 // 返回值类型: Integer, 成功返回1, 失败返回0
-func (c *Client) Move(key string, targetDB int) (*Reply, error) {
+func (c *Client) Move(key string, targetDB int) (bool, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("MOVE", key, targetDB)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // Persist v2.2.0后可用
@@ -622,12 +721,17 @@ func (c *Client) Move(key string, targetDB int) (*Reply, error) {
 // 时间复杂度: O(1)
 // 移除key的过期时间, key将永久保持
 // 返回值类型: Integer, 移除成功返回1, key不存在或者key没有过期时间, 返回0
-func (c *Client) Persist(key string) (*Reply, error) {
+func (c *Client) Persist(key string) (bool, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("PERSIST", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // PTTL v2.6.0后可用
@@ -637,12 +741,17 @@ func (c *Client) Persist(key string) (*Reply, error) {
 // 在2.6版本以前, 如果key不存在或者key存在但没有过期时间时都返回-1
 // 2.6版本后, 如果key不存在返回-1, 如果key存在但没有过期时间时返回-2
 // 返回值类型: Integer, key不存在时返回-2, key存在但没有过期时间时返回-1, 否则以毫秒为单位返回剩余过期时间
-func (c *Client) PTTL(key string) (*Reply, error) {
+func (c *Client) PTTL(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("PTTL", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // TTL v1.0.0后可用
@@ -650,12 +759,17 @@ func (c *Client) PTTL(key string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 以秒为单位返回key剩余的过期时间
 // 返回值类型: Integer, key不存在时返回-2, key存在但没有过期时间时返回-1, 否则以秒为单位返回剩余过期时间
-func (c *Client) TTL(key string) (*Reply, error) {
+func (c *Client) TTL(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("TTL", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 //
@@ -664,12 +778,17 @@ func (c *Client) TTL(key string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 从当前数据库中随机返回一个key
 // 返回值类型: Bulk String, 如果数据库没有key, 返回nil, 否则随机返回一个key
-func (c *Client) RandomKey() (*Reply, error) {
+func (c *Client) RandomKey() (string, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("RANDOMKEY")
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // Rename v1.0.0后可用
@@ -679,12 +798,17 @@ func (c *Client) RandomKey() (*Reply, error) {
 // 当newKey已经存在时, 其值将会被覆盖
 // 返回值类型: Simple String, 修改成功时返回OK, 失败返回错误
 // v3.2.0后, 如果key和newKey相同不再返回错误
-func (c *Client) Rename(key, newKey string) (*Reply, error) {
+func (c *Client) Rename(key, newKey string) (bool, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("RENAME", key, newKey)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // RenameNX v1.0.0后可用
@@ -693,12 +817,17 @@ func (c *Client) Rename(key, newKey string) (*Reply, error) {
 // 仅当newKey不存在时将key改名为newKey
 // 返回值类型: 修改成功返回1, 如果newKey已经存在返回0
 // v3.2.0后, 如果key和newKey相同不再返回错误
-func (c *Client) RenameNX(key, newKey string) (*Reply, error) {
+func (c *Client) RenameNX(key, newKey string) (bool, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("RENAMENX", key, newKey)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // Scan v2.8.0后可用
@@ -749,10 +878,15 @@ func (c *Client) Scan(cursor int, option *generic.ScanOption) (result *generic.S
 // set: 集合
 // zset: 有序集
 // hash: 哈希表
-func (c *Client) Type(key string) (*Reply, error) {
+func (c *Client) Type(key string) (string, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("TYPE", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }

@@ -13,13 +13,18 @@ import (
 // 时间复杂度: O(N), N为要删除的字段数
 // 用于移除key存储的hash数据中的指定字段, 对于key中不存在的字段将会被忽略, 如果key不存在命令将会返回0
 // 返回值类型: Integer, 返回实际被移除的字段数量, 不包含指定但不存在的字段
-func (c *Client) HDel(key string, fields ...string) (*Reply, error) {
+func (c *Client) HDel(key string, fields ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("HDEL", key)
 	cmd.Append(fields...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // HExists v2.0.0后可用
@@ -27,12 +32,17 @@ func (c *Client) HDel(key string, fields ...string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 获取key中指定字段是否存在
 // 返回值类型: Integer, 如果存在返回1, 如果key不存在或者key不包含该字段则返回0
-func (c *Client) HExists(key string, field string) (*Reply, error) {
+func (c *Client) HExists(key string, field string) (bool, error) {
 	cmd := args.Get()
 	cmd.Append("HEXISTS", key, field)
 	cmdbytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdbytes)
+
+	reply, err := c.sendCommand(cmdbytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // HGet v2.0.0后可用
@@ -74,13 +84,18 @@ func (c *Client) HGetAll(key string) (hash.FieldValue, error) {
 // 时间复杂度: O(1)
 // 给hash指定字段添加指定的增量, 如果field不存在, 则在操作之前会将field的值置为0
 // 返回值类型: Integer, 返回增加操作后的值
-func (c *Client) HIncrBy(key string, field string, increment int64) (*Reply, error) {
+func (c *Client) HIncrBy(key string, field string, increment int64) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("HINCRBY", key, field)
 	cmd.AppendArgs(increment)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // HIncrByFloat v2.6.0后可用
@@ -90,13 +105,18 @@ func (c *Client) HIncrBy(key string, field string, increment int64) (*Reply, err
 // 1. field包含错误类型的值(类型不为string)
 // 2. 字段当前的值或者指定的增量无法被解析成双精度浮点数
 // 返回值类型: Bulk String, 返回incr操作后字段的值
-func (c *Client) HIncrByFloat(key string, field string, increment float64) (*Reply, error) {
+func (c *Client) HIncrByFloat(key string, field string, increment float64) (float64, error) {
 	cmd := args.Get()
 	cmd.Append("HINCRBYFLOAT", key, field)
 	cmd.AppendArgs(increment)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Float()
 }
 
 // HKeys v2.0.0后可用
@@ -104,12 +124,17 @@ func (c *Client) HIncrByFloat(key string, field string, increment float64) (*Rep
 // 时间复杂度: O(N), N为hash的大小
 // 获取存储在key中的hash值的所有的字段
 // 返回值类型: Array, 返回hash字段的列表, 如果key不存在则返回空列表
-func (c *Client) HKeys(key string) (*Reply, error) {
+func (c *Client) HKeys(key string) ([]string, error) {
 	cmd := args.Get()
 	cmd.Append("HKEYS", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseHKeysResult()
 }
 
 // HLen v2.0.0后可用
@@ -117,12 +142,17 @@ func (c *Client) HKeys(key string) (*Reply, error) {
 // 时间复杂度: O(1)
 // 获取hash的字段数量
 // 返回值类型: Integer, 返回key对应hash值的字段数量, 如果key不存在则返回0
-func (c *Client) HLen(key string) (*Reply, error) {
+func (c *Client) HLen(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("HLEN", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // HMGet v2.0.0后可用
@@ -221,7 +251,7 @@ func (c *Client) HScan(key string, cursor int, pattern string, count int64) (res
 // 时间复杂度: 如果只添加一对, 则是O(1), 否则为O(N), N为键值对的数量
 // 设置hash的一对键值对, 如果字段已经存在, 将会被覆盖
 // 返回值类型: Integer, 返回添加的键值对的数量
-func (c *Client) HSet(key string, fvs hash.FieldValue) (*Reply, error) {
+func (c *Client) HSet(key string, fvs hash.FieldValue) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("HSET", key)
 	fvs.Range(func(key string, value interface{}) (breakOut bool) {
@@ -231,7 +261,12 @@ func (c *Client) HSet(key string, fvs hash.FieldValue) (*Reply, error) {
 	})
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // HSetNX v2.0.0后可用
@@ -239,13 +274,18 @@ func (c *Client) HSet(key string, fvs hash.FieldValue) (*Reply, error) {
 // 时间复杂度: O(1)
 // 只有当字段不存在时才设置hash对应field的值
 // 返回值类型: Integer, 如果设置成功返回1, 否则返回0
-func (c *Client) HSetNX(key string, field string, value interface{}) (*Reply, error) {
+func (c *Client) HSetNX(key string, field string, value interface{}) (bool, error) {
 	cmd := args.Get()
 	cmd.Append("HSETNX", key, field)
 	cmd.AppendArgs(value)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return false, err
+	}
+	return reply.Bool()
 }
 
 // HStrLen v3.2.0后可用
@@ -253,12 +293,17 @@ func (c *Client) HSetNX(key string, field string, value interface{}) (*Reply, er
 // 时间复杂度: O(1)
 // 获取hash指定字段的值的长度
 // 返回值类型: Integer, 返回key中field字段对应的值的长度
-func (c *Client) HStrLen(key string, field string) (*Reply, error) {
+func (c *Client) HStrLen(key string, field string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("HSTRLEN", key, field)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // HVals v2.0.0后可用

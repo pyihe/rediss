@@ -158,13 +158,18 @@ func (c *Client) LIndex(key string, index int64) (*Reply, error) {
 // pos: BEFORE|AFTER
 // pivot: 基准值
 // element: 插入的元素值
-func (c *Client) LInsert(key string, pos string, pivot, element interface{}) (*Reply, error) {
+func (c *Client) LInsert(key string, pos string, pivot, element interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("LINSERT", key, pos)
 	cmd.AppendArgs(pivot, element)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // LLen v1.0.0后可用
@@ -172,12 +177,17 @@ func (c *Client) LInsert(key string, pos string, pivot, element interface{}) (*R
 // 时间复杂度: O(1)
 // 返回指定队列的长度, 如果队列不存在, 被认为是空队列并且返回0, 如果key数据类型不是队列, 将会返回错误
 // 返回值类型: Integer, 返回队列的长度
-func (c *Client) LLen(key string) (*Reply, error) {
+func (c *Client) LLen(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("LLEN", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // LMove v6.2.0后可用
@@ -304,13 +314,18 @@ func (c *Client) LPos(key string, element interface{}, option *list.PosOption) (
 // 向key指定的队列头部插入指定的元素, 如果key不存在则会先创建一个空的队列在push, 如果key存储的数据类型不是队列, 将会返回错误
 // 返回值类型:　Integer, push成功后队列的长度
 // v2.4.0开始可以push多个元素
-func (c *Client) LPush(key string, elements ...interface{}) (*Reply, error) {
+func (c *Client) LPush(key string, elements ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("LPUSH", key)
 	cmd.AppendArgs(elements...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // LPushX v2.2.0后可用
@@ -319,13 +334,18 @@ func (c *Client) LPush(key string, elements ...interface{}) (*Reply, error) {
 // 当且仅当key存在并且key存储的是队列类型时, 向key指定的队列插入元素
 // 返回值类型: Integer, push成功后队列的长度
 // v4.0.0开始接受多个元素
-func (c *Client) LPushX(key string, elements ...interface{}) (*Reply, error) {
+func (c *Client) LPushX(key string, elements ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("LPUSHX", key)
 	cmd.AppendArgs(elements...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // LRange v1.0.0后可用
@@ -354,13 +374,18 @@ func (c *Client) LRange(key string, start, stop int64) (*Reply, error) {
 // count = 0: 移除所有的element
 // 当key不存在时, 将会被认为是空队列
 // 返回值类型: Integer, 被移除的element数量
-func (c *Client) LRem(key string, count int64, element interface{}) (*Reply, error) {
+func (c *Client) LRem(key string, count int64, element interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("LREM", key)
 	cmd.AppendArgs(count, element)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // LSet v1.0.0后可用
@@ -368,13 +393,18 @@ func (c *Client) LRem(key string, count int64, element interface{}) (*Reply, err
 // 时间复杂度: O(N), N为list的长度
 // 将索引为index的元素设置为element, 如果索引越界了, 将会返回错误
 // 返回值类型: Simple String
-func (c *Client) LSet(key string, index int64, element interface{}) (*Reply, error) {
+func (c *Client) LSet(key string, index int64, element interface{}) (string, error) {
 	cmd := args.Get()
 	cmd.Append("LSET", key)
 	cmd.AppendArgs(index, element)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // LTrim v1.0.0后可用
@@ -384,13 +414,18 @@ func (c *Client) LSet(key string, index int64, element interface{}) (*Reply, err
 // start和stop同样可以为负数, 表示从列表尾部开始计算
 // 索引越界时不会产生错误, 如果start大于列表的末尾, 或者start>end, 结果将是一个空列表(这会导致key被删除), 如果end大于列表的末尾, Redis会将其视为列表的最后一个元素
 // 返回值类型: Simple String
-func (c *Client) LTrim(key string, start, stop int64) (*Reply, error) {
+func (c *Client) LTrim(key string, start, stop int64) (string, error) {
 	cmd := args.Get()
 	cmd.Append("LTRIM", key)
 	cmd.AppendArgs(start, stop)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return "", err
+	}
+	return reply.ValueString(), nil
 }
 
 // RPop v1.0.0后可用
@@ -436,13 +471,18 @@ func (c *Client) RPopLPush(src, dst string) (*Reply, error) {
 // 将指定的元素插入进key所在的列表中, 如果key不存在, 命令将会创建一个空的列表然后再执行push操作, 如果key存储的数据类型不是list, 将会返回错误
 // 返回值类型: Integer, 返回push后列表的长度
 // v2.4.0后开始接受多个元素
-func (c *Client) RPush(key string, elements ...interface{}) (*Reply, error) {
+func (c *Client) RPush(key string, elements ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("RPUSH", key)
 	cmd.AppendArgs(elements...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // RPushX v2.2.0后可用
@@ -451,11 +491,16 @@ func (c *Client) RPush(key string, elements ...interface{}) (*Reply, error) {
 // 只有当key存在并且值类型为list时才会将elements插入进key对应的list
 // 与RPUSH相比不同的是, 当key不存在时RPUSHX不会执行任何操作
 // 返回值类型: Integer, push操作后的list长度
-func (c *Client) RPushX(key string, elements ...interface{}) (*Reply, error) {
+func (c *Client) RPushX(key string, elements ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("RPUSHX", key)
 	cmd.AppendArgs(elements...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
