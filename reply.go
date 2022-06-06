@@ -335,6 +335,10 @@ func (reply *Reply) parseHKeysResult() (result []string, err error) {
 	return
 }
 
+//func (reply *Reply) parseZPop() (result *sortedset.PopResult, err error) {
+//	array := reply.Array()
+//}
+
 // Just for test
 func (reply *Reply) print(prefix string) {
 	if reply == nil {

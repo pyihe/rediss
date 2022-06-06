@@ -1,9 +1,11 @@
 package rediss
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pyihe/rediss/args"
+	"github.com/pyihe/rediss/model/sortedset"
 )
 
 // BZMPop v7.0.0后可用
@@ -15,24 +17,26 @@ import (
 // 返回值类型: Array, 如果没有成员可以pop时返回nil,
 // 否则将返回双元素数组, 第一个元素是有序集合的名称, 第二个元素是一个数组, 为从该有序集合中pop出的元素组成,
 // 每个元素同样也是一个包含成员以及它的分数的数组
-func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) (*Reply, error) {
+func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) (*sortedset.PopResult, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 	cmd.Append("BZMPOP")
 	cmd.AppendArgs(timeout, len(keys))
 	cmd.Append(keys...)
-	switch strings.ToUpper(op) {
-	case "MIN", "MAX":
-		cmd.Append(op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
-	}
+	cmd.Append(op)
 	if count > 1 {
 		cmd.AppendArgs("COUNT", count)
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	fmt.Println(len(reply.Array()))
+	reply.print("")
+	return nil, nil
 }
 
 // BZPopMax v5.0.0后可用
@@ -83,44 +87,28 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*Reply, error) {
 // 当没有提供可选参数时, 返回新增元素的个数
 // 如果指定了CH参数, 返回新增以及更新的元素个数
 // 如果提供了INCR参数, 返回值将会变为Bulk String, 返回成员的新分数(双精度浮点数)表示为字符串，如果操作被中止（当使用 XX 或 NX 选项调用时），则为 nil
-//
-// 函数参数说明:
-// key: 指定有序集合的名字
-// xOp: [XX|NX], XX表示如果元素存在则只更新分数; NX表示只当元素不存在时才添加, 已经存在则不进行操作
-// tOp: [LT|GT], LT表示对于已经存在的元素, 只当插入的新分数小于旧值分数时才更新, GT表示只当大于旧值分数时才更新
-// ch: 将返回值从添加的新元素的数量修改为改变的元素总数（CH是changed的缩写）。更改的元素是添加的新元素和已更新分数的元素。因此，命令行中指定的与过去得分相同的元素不计算在内。注意：通常 ZADD 的返回值只计算添加的新元素的数量
-// incr: 指定此选项时，ZADD 的作用类似于 ZINCRBY。在此模式下只能指定一个分数元素对
-func (c *Client) ZAdd(key string, xOp string, tOp string, ch, incr bool, scoreMemPair ...interface{}) (*Reply, error) {
-	if n := len(scoreMemPair); n == 0 || n%2 != 0 {
-		return nil, ErrInvalidArgumentFormat
-	}
+func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
 	cmd.Append("ZADD", key)
-	switch strings.ToUpper(xOp) {
-	case "NX", "XX":
-		cmd.Append(xOp)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if option != nil {
+		if option.NxOrXX != "" {
+			cmd.Append(option.NxOrXX)
+		}
+		if option.GtOrLt != "" {
+			cmd.Append(option.GtOrLt)
+		}
+		if option.Ch {
+			cmd.Append("CH")
+		}
+		if option.Incr {
+			cmd.Append("INCR")
+		}
 	}
-	switch strings.ToUpper(tOp) {
-	case "GT", "LT":
-		cmd.Append(tOp)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	for _, mem := range members {
+		cmd.AppendArgs(mem.Score, mem.Value)
 	}
-	if ch {
-		cmd.Append("CH")
-	}
-	if incr {
-		cmd.Append("INCR")
-	}
-	cmd.AppendArgs(scoreMemPair...)
 	return c.sendCommand(cmd.Bytes())
 }
 
