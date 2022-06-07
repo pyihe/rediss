@@ -12,6 +12,7 @@ import (
 	"github.com/pyihe/rediss/model/hash"
 	"github.com/pyihe/rediss/model/list"
 	"github.com/pyihe/rediss/model/set"
+	"github.com/pyihe/rediss/model/sortedset"
 )
 
 // Reply load parsed reply from redis server
@@ -335,9 +336,76 @@ func (reply *Reply) parseHKeysResult() (result []string, err error) {
 	return
 }
 
-//func (reply *Reply) parseZPop() (result *sortedset.PopResult, err error) {
-//	array := reply.Array()
-//}
+func (reply *Reply) parseZPop() (result *sortedset.PopResult, err error) {
+	array := reply.Array()
+	result = &sortedset.PopResult{}
+	result.Key = array[0].ValueString()
+	memberArray := array[1].Array()
+	result.Members = make([]sortedset.Member, 0, len(memberArray))
+	for _, mem := range memberArray {
+		pm := mem.Array()
+		m := sortedset.Member{}
+		m.Value = pm[0].ValueString()
+		m.Score, err = pm[1].Float()
+		if err != nil {
+			return nil, err
+		}
+		result.Members = append(result.Members, m)
+	}
+	return
+}
+
+func (reply *Reply) parseZPopXX() (result *sortedset.PopResult, err error) {
+	array := reply.Array()
+	result = &sortedset.PopResult{
+		Members: make([]sortedset.Member, 1),
+	}
+	result.Key = array[0].ValueString()
+	member := sortedset.Member{}
+	member.Value = array[1].ValueString()
+	member.Score, err = array[2].Float()
+	result.Members[0] = member
+	return
+}
+
+func (reply *Reply) parseToMember(withScore bool) (result []sortedset.Member, err error) {
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
+}
+
+func (reply *Reply) parseZMScore() (result []float64, err error) {
+	array := reply.Array()
+	result = make([]float64, len(array))
+	for i := 0; i < len(array); i++ {
+		if array[i] == nil {
+			continue
+		}
+		result[i], err = array[i].Float()
+		if err != nil {
+			break
+		}
+	}
+	return
+}
 
 // Just for test
 func (reply *Reply) print(prefix string) {

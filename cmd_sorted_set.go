@@ -1,7 +1,6 @@
 package rediss
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/pyihe/rediss/args"
@@ -34,9 +33,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 	if err != nil || reply == nil {
 		return nil, err
 	}
-	fmt.Println(len(reply.Array()))
-	reply.print("")
-	return nil, nil
+	return reply.parseZPop()
 }
 
 // BZPopMax v5.0.0后可用
@@ -47,14 +44,18 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 // 返回值类型: Array, 没有元素可以pop或者超时时, 返回nil
 // 三元素, 第一个元素为pop元素的有序集合名字, 第二个元素为它本身, 第三个元素为被pop元素的分数
 // v6.0.0后开始timeout由整型变为双精度浮点型
-func (c *Client) BZPopMax(keys []string, timeout float64) (*Reply, error) {
+func (c *Client) BZPopMax(keys []string, timeout float64) (*sortedset.PopResult, error) {
 	cmd := args.Get()
 	cmd.Append("BZPOPMAX")
 	cmd.Append(keys...)
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseZPopXX()
 }
 
 // BZPopMin v5.0.0后可用
@@ -65,14 +66,19 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (*Reply, error) {
 // 返回值类型: Array, 没有元素可以pop或者超时时, 返回nil
 // 三元素, 第一个元素为pop元素的有序集合名字, 第二个元素为它本身, 第三个元素为被pop元素的分数
 // v6.0.0后开始timeout由整型变为双精度浮点型
-func (c *Client) BZPopMin(keys []string, timeout float64) (*Reply, error) {
+func (c *Client) BZPopMin(keys []string, timeout float64) (*sortedset.PopResult, error) {
 	cmd := args.Get()
 	cmd.Append("BZPOPMIN")
 	cmd.Append(keys...)
 	cmd.AppendArgs(timeout)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseZPopXX()
 }
 
 // ZAdd v1.2.0后可用
@@ -84,9 +90,9 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*Reply, error) {
 // 如果key所持有的数据类型不为有序集合, 将会返回错误
 // 分数为双精度浮点型
 // 返回值类型: Integer,
-// 当没有提供可选参数时, 返回新增元素的个数
-// 如果指定了CH参数, 返回新增以及更新的元素个数
-// 如果提供了INCR参数, 返回值将会变为Bulk String, 返回成员的新分数(双精度浮点数)表示为字符串，如果操作被中止（当使用 XX 或 NX 选项调用时），则为 nil
+// 当没有提供可选参数时, 返回新增元素的个数, 通过Reply.Integer获取结果
+// 如果指定了CH参数, 返回新增以及更新的元素个数, 通过Reply.Integer获取结果
+// 如果提供了INCR参数, 返回值将会变为Bulk String, 返回成员的新分数(双精度浮点数)表示为字符串，如果操作被中止（当使用 XX 或 NX 选项调用时），则为 nil, 通过Reply.ValueString获取结果
 func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
@@ -117,12 +123,17 @@ func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sorte
 // 时间复杂度: O(1)
 // 获取指定key的有序集合的基数
 // 返回值类型: Integer, 返回有序集合的基数, 如果key不存在返回0
-func (c *Client) ZCard(key string) (*Reply, error) {
+func (c *Client) ZCard(key string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZCARD", key)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZCount v2.0.0后可用
@@ -130,21 +141,26 @@ func (c *Client) ZCard(key string) (*Reply, error) {
 // 时间复杂度: O(log(N)), N为有序集合中元素的个数
 // 获取有序集合中分数在[min, max]之间的元素个数
 // 返回值类型: Integer, 返回在指定分数范围内的元素个数
-func (c *Client) ZCount(key string, min, max int64) (*Reply, error) {
+func (c *Client) ZCount(key string, min, max int64) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZCOUNT", key)
 	cmd.AppendArgs(min, max)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZDiff v6.2.0后可用
 // 命令格式: ZDIFF numkeys key [key ...] [WITHSCORES]
 // 时间复杂度: O(L + (N-K)log(N)), L为所有有序集合的成员总数, N为第一个有序集合的成员数量, K为结果集合的成员数量
-// 获取指定有序集合之间的差异
+// 获取给定的第一个集合和后续集合之间的差集
 // 返回值类型: Array, 返回差异成员(如果提供了WITHSCORES参数, 则会携带分数)
-func (c *Client) ZDiff(keys []string, withScore bool) (*Reply, error) {
+func (c *Client) ZDiff(withScore bool, keys ...string) ([]sortedset.Member, error) {
 	cmd := args.Get()
 	cmd.Append("ZDIFF")
 	cmd.AppendArgs(len(keys))
@@ -154,7 +170,13 @@ func (c *Client) ZDiff(keys []string, withScore bool) (*Reply, error) {
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseToMember(withScore)
 }
 
 // ZDiffStore v6.2.0后可用
@@ -162,14 +184,19 @@ func (c *Client) ZDiff(keys []string, withScore bool) (*Reply, error) {
 // 时间复杂度: O(L + (N-K)log(N)), L为所有有序集合的成员总数, N为第一个有序集合的成员数量, K为结果集合的成员数量
 // 获取指定有序集合之间的差异, 并存储在指定的key中, 如果dst已经存在则其旧值将会被覆盖
 // 返回值类型: Integer, 返回存储进dst的元素数量
-func (c *Client) ZDiffStore(dst string, keys []string) (*Reply, error) {
+func (c *Client) ZDiffStore(dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZDIFFSTORE", dst)
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZIncrBy v1.2.0后可用
@@ -178,13 +205,18 @@ func (c *Client) ZDiffStore(dst string, keys []string) (*Reply, error) {
 // 对有序集合中的指定元素的分数进行增量, 如果元素不存在则会以增量为分数添加一个新元素, 如果key不存在, 则创建一个以指定成员为唯一成员的新排序集
 // 如果key持有的数据类型不是有序集合, 将会返回一个错误
 // 返回值类型: Bulk String, 返回增量后的分数
-func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (*Reply, error) {
+func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (float64, error) {
 	cmd := args.Get()
 	cmd.Append("ZINCRBY", key)
 	cmd.AppendArgs(increment, member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Float()
 }
 
 // ZInter v6.2.0后可用
@@ -195,10 +227,8 @@ func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (*Re
 // 使用WEIGHTS选项, 可以为每个输入排序集指定一个乘法因子, 即每个有序集合的每个元素的分数在传递给聚合函数之前都会乘以该因子; 当未给出WEIGHTS时, 乘法因子默认为1
 // 使用AGGREGATE选项，可以指定联合结果的聚合方式, 此选项默认为SUM, 即并集中元素的分数为所有有序集合中的总和, 当此选项设置为MIN或MAX时, 结果集将包含元素在所有有序集合中的最小或最大分数
 // 返回值类型: Array, 交集的结果(如果给出了WITHSCORES选项, 则可以选择它们的分数)
-func (c *Client) ZInter(keys []string, weights []float64, op string, withScore bool) (*Reply, error) {
+func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, withScore bool) ([]sortedset.Member, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("ZINTER")
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
@@ -208,18 +238,44 @@ func (c *Client) ZInter(keys []string, weights []float64, op string, withScore b
 			cmd.AppendArgs(w)
 		}
 	}
-	switch strings.ToUpper(op) {
-	case "SUM", "MIN", "MAX":
-		cmd.Append("AGGREGATE", op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if Aggregate != "" {
+		cmd.Append("AGGREGATE", Aggregate)
 	}
 	if withScore {
 		cmd.Append("WITHSCORES")
 	}
-	return c.sendCommand(cmd.Bytes())
+
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(withScore)
+}
+
+// ZInterCard v7.0.0开始可用
+// 命令格式: ZINTERCARD numkeys key [key ...] [LIMIT limit]
+// 计算有序集合的交集, 但只返回交集的基数
+// LIMIT选项用于限制基数, 计算交集过程中如果交集的基数达到了LIMIT, 则终止命令直接返回
+// 返回值类型: Integer
+func (c *Client) ZInterCard(keys []string, limit int64) (int64, error) {
+	cmd := args.Get()
+	cmd.Append("ZINTERCARD")
+	cmd.AppendArgs(len(keys))
+	cmd.Append(keys...)
+	if limit > 0 {
+		cmd.AppendArgs("LIMIT", limit)
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+
+	return reply.Integer()
 }
 
 // ZInterStore v2.0.0后可用
@@ -230,11 +286,9 @@ func (c *Client) ZInter(keys []string, weights []float64, op string, withScore b
 // 使用WEIGHTS选项, 可以为每个输入排序集指定一个乘法因子, 即每个有序集合的每个元素的分数在传递给聚合函数之前都会乘以该因子; 当未给出WEIGHTS时, 乘法因子默认为1
 // 使用AGGREGATE选项，可以指定联合结果的聚合方式, 此选项默认为SUM, 即并集中元素的分数为所有有序集合中的总和, 当此选项设置为MIN或MAX时, 结果集将包含元素在所有有序集合中的最小或最大分数
 // 如果dst已经存在, 其旧值将被覆盖
-// 返回值类型: Array, 交集的结果(如果给出了WITHSCORES选项, 则可以选择它们的分数)
-func (c *Client) ZInterStore(dst string, keys []string, weights []float64, op string) (*Reply, error) {
+// 返回值类型: Integer
+func (c *Client) ZInterStore(dst string, keys []string, weights []float64, Aggregate string) (int64, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("ZINTERSTORE", dst)
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
@@ -244,15 +298,18 @@ func (c *Client) ZInterStore(dst string, keys []string, weights []float64, op st
 			cmd.AppendArgs(w)
 		}
 	}
-	switch strings.ToUpper(op) {
-	case "SUM", "MIN", "MAX":
-		cmd.Append("AGGREGATE", op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if Aggregate != "" {
+		cmd.Append("Aggregate", Aggregate)
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+
+	return reply.Integer()
 }
 
 // ZLexCount v2.8.9后可用
@@ -261,12 +318,17 @@ func (c *Client) ZInterStore(dst string, keys []string, weights []float64, op st
 // 当有序集合中所有元素的分数相同时, 为了强制字典序排序, 此命令返回介于min和max之间的元素个数
 // min和max必须以(或者[开头, +和-分别表示正无穷和负无穷字符串, 所以"ZLEXCOUNT setName + -"表示返回有序集合的成员总数
 // 返回值类型: Integer, 返回指定范围内元素总数
-func (c *Client) ZLexCount(key string, min, max string) (*Reply, error) {
+func (c *Client) ZLexCount(key string, min, max string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZLEXCOUNT", key, min, max)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZMPop v7.0.0后可用
@@ -276,24 +338,24 @@ func (c *Client) ZLexCount(key string, min, max string) (*Reply, error) {
 // 当指定MIN参数时, 弹出的元素是第一个非空排序集中得分最低的元素; MAX参数使得分最高的元素被弹出
 // COUNT指定需要pop的元素数量, 默认为1
 // 返回值类型: Array, 如果没有元素可以pop时返回nil; 有元素可以pop时返回一个双元素的数组, 第一个元素为有序集合名称, 第二个元素为成员-分数的数组
-func (c *Client) ZMPop(keys []string, op string, count int64) (*Reply, error) {
+func (c *Client) ZMPop(keys []string, op string, count int64) (*sortedset.PopResult, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
 	cmd.Append("ZMPOP")
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
-	switch strings.ToUpper(op) {
-	case "MIN", "MAX":
-		cmd.Append(op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
-	}
+	cmd.Append(op)
 	if count > 1 {
 		cmd.AppendArgs("COUNT", count)
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseZPop()
 }
 
 // ZMScore v6.2.0后可用
@@ -302,13 +364,19 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*Reply, error) {
 // 获取有序集合key中指定成员的分数
 // 对于每个不存在的成员, 返回nil
 // 返回值类型: Array, 与成员关联的分数或者nil列表
-func (c *Client) ZMScore(key string, members ...interface{}) (*Reply, error) {
+func (c *Client) ZMScore(key string, members ...interface{}) ([]float64, error) {
 	cmd := args.Get()
 	cmd.Append("ZMSCORE", key)
 	cmd.AppendArgs(members...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseZMScore()
 }
 
 // ZPopMax v5.0.0后可用
@@ -317,7 +385,7 @@ func (c *Client) ZMScore(key string, members ...interface{}) (*Reply, error) {
 // 从指定的有序集合中移除并且返回count个分数最高的成员
 // 如果没有指定count, count默认值为1; 如果count值大于有序集合的基数将不会产生错误, 当返回多个元素时, 将会根据分数由高到低的pop
 // 返回值类型: Array, 返回成员和分数的数组
-func (c *Client) ZPopMax(key string, count int64) (*Reply, error) {
+func (c *Client) ZPopMax(key string, count int64) ([]sortedset.Member, error) {
 	cmd := args.Get()
 	cmd.Append("ZPOPMAX", key)
 	if count > 1 {
@@ -325,7 +393,13 @@ func (c *Client) ZPopMax(key string, count int64) (*Reply, error) {
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseToMember(true)
 }
 
 // ZPopMin v5.0.0后可用
@@ -333,7 +407,7 @@ func (c *Client) ZPopMax(key string, count int64) (*Reply, error) {
 // 时间复杂度: O(log(N)*M), N为有序集合中的元素数量, M为被pop的元素数量
 // 与ZPOPMAX相似, 不同之处在于ZPOPMIN返回的是分数由低到高的count个元素
 // 返回值类型: Array, 返回成员和分数的数组
-func (c *Client) ZPopMin(key string, count int64) (*Reply, error) {
+func (c *Client) ZPopMin(key string, count int64) ([]sortedset.Member, error) {
 	cmd := args.Get()
 	cmd.Append("ZPOPMIN", key)
 	if count > 1 {
@@ -341,7 +415,13 @@ func (c *Client) ZPopMin(key string, count int64) (*Reply, error) {
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+
+	return reply.parseToMember(true)
 }
 
 // ZRandMember v6.2.0后可用
@@ -354,7 +434,7 @@ func (c *Client) ZPopMin(key string, count int64) (*Reply, error) {
 // 返回值类型:
 // 1. Bulk String: 没有指定count参数时将会返回被选中的元素, 如果key不存在返回nil
 // 2. Array: 如果指定了count, 将会返回被选中元素的数组, key不存在时返回空数组; 如果使用了WITHSCORES, 数组将带有分数
-func (c *Client) ZRandMember(key string, count int64, withScore bool) (*Reply, error) {
+func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sortedset.Member, error) {
 	cmd := args.Get()
 	cmd.Append("ZRANDMEMBER", key)
 	if count != 0 {
@@ -365,7 +445,35 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) (*Reply, e
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	if count == 0 {
+		m := sortedset.Member{Value: reply.ValueString()}
+		return []sortedset.Member{m}, nil
+	}
+
+	var result []sortedset.Member
+	var array = reply.array
+	if !withScore {
+		result = make([]sortedset.Member, 0, len(array))
+		for i := 0; i < len(array); i++ {
+			m := sortedset.Member{Value: array[i].ValueString()}
+			result = append(result, m)
+		}
+		return result, nil
+	}
+
+	result = make([]sortedset.Member, 0, len(array)/2)
+	for i := 0; i < len(array)-1; i += 2 {
+		m := sortedset.Member{}
+		m.Value = array[i].ValueString()
+		m.Score, err = array[i+1].Float()
+		result = append(result, m)
+	}
+	return result, nil
 }
 
 // ZRange v1.2.0后可用
