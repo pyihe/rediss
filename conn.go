@@ -67,9 +67,11 @@ func (c *conn) readReply(timeout time.Duration) (reply *Reply, err error) {
 		return
 	}
 	reply = parse(response)
-	if reply != nil && reply.err != nil {
-		err = reply.err
+	if reply == nil {
+		err = NilReply
+		return
 	}
+	err = reply.err
 	return
 }
 

@@ -472,7 +472,7 @@ func (c *Client) Dump(key string) (string, error) {
 	args.Put(cmd)
 	reply, err := c.sendCommand(cmdBytes)
 	if reply == nil && err == nil {
-		err = ErrKeyNotExists
+		err = NilReply
 		return "", err
 	}
 	return reply.ValueString(), err

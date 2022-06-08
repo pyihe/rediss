@@ -11,6 +11,7 @@ import (
 	"github.com/pyihe/rediss/model/geo"
 	"github.com/pyihe/rediss/model/hash"
 	"github.com/pyihe/rediss/model/list"
+	"github.com/pyihe/rediss/model/redisstring"
 	"github.com/pyihe/rediss/model/set"
 	"github.com/pyihe/rediss/model/sortedset"
 )
@@ -424,6 +425,45 @@ func (reply *Reply) parseZScanResult() (result *sortedset.ScanResult, err error)
 			return
 		}
 		result.Members = append(result.Members, m)
+	}
+	return
+}
+
+func (reply *Reply) parseLCSResult() (result *redisstring.LCSResult, err error) {
+	result = &redisstring.LCSResult{}
+	array := reply.Array()
+
+	// 获取LCS结果的长度
+	result.Len, err = array[3].Integer()
+	if err != nil {
+		return
+	}
+
+	// 获取每个匹配结果的位置
+	matchArray := array[1].Array()
+	result.Matches = make([]redisstring.LCSMatch, 0, len(matchArray))
+	for _, mat := range matchArray {
+		m := redisstring.LCSMatch{
+			Indexes: make([]redisstring.Index, 0, 3),
+		}
+		indexArray := mat.Array()
+		for i := 0; i < 2; i++ {
+			posArray := indexArray[i].Array()
+			idx := redisstring.Index{}
+			if idx.Start, err = posArray[0].Integer(); err != nil {
+				return
+			}
+			if idx.Stop, err = posArray[1].Integer(); err != nil {
+				return
+			}
+			m.Indexes = append(m.Indexes, idx)
+		}
+		if len(indexArray) == 3 {
+			if m.Len, err = indexArray[2].Integer(); err != nil {
+				return
+			}
+		}
+		result.Matches = append(result.Matches, m)
 	}
 	return
 }

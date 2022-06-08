@@ -3,7 +3,7 @@ package rediss
 import "github.com/pyihe/go-pkg/errors"
 
 var (
-	ErrKeyNotExists          = errors.New("key not exists")
+	NilReply                 = errors.New("nil reply")
 	ErrInvalidReplyFormat    = errors.New("invalid reply format")
 	ErrInvalidArgumentFormat = errors.New("invalid argument's format")
 	ErrNotSupportArgument    = errors.New("not support argument")
