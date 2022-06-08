@@ -1,8 +1,6 @@
 package rediss
 
 import (
-	"strings"
-
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/sortedset"
 )
@@ -505,30 +503,35 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sorteds
 // REV选项颠倒<start>和<stop>元素的顺序, 其中<start>必须按字典顺序大于<stop>才能产生非空结果
 //
 // 返回值类型: Array, 返回由有序集合元素组成的数组
-func (c *Client) ZRange(key string, min, max interface{}, by string, rev, withScores bool, offset, limit int64) (*Reply, error) {
+func (c *Client) ZRange(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+	withScore := false
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("ZRANGE", key)
-	cmd.AppendArgs(min, max)
-	switch strings.ToUpper(by) {
-	case "BYSCORE", "BYLEX":
-		cmd.Append(by)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.By != "" {
+			cmd.Append(option.By)
+		}
+		if option.Rev {
+			cmd.Append("REV")
+		}
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
+		if option.WithScore {
+			cmd.Append("WITHSCORES")
+			withScore = true
+		}
 	}
-	if rev {
-		cmd.Append("REV")
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
 	}
-	if limit > 0 && offset >= 0 {
-		cmd.AppendArgs("LIMIT", offset, limit)
-	}
-	if withScores {
-		cmd.Append("WITHSCORES")
-	}
-	return c.sendCommand(cmd.Bytes())
+
+	return reply.parseToMember(withScore)
 }
 
 // ZRangeByLex v2.8.9后可用, v6.2.0后废弃
@@ -538,15 +541,23 @@ func (c *Client) ZRange(key string, min, max interface{}, by string, rev, withSc
 // 如果有序集合中所有的成员分数相同, 此命令按照字典序返回min和max之间的元素
 // 有效的start和stop必须以(或[开头, 以指定范围项是分别是互斥的还是包含的; start和stop的+或-的特殊值具有特殊含义或正无限和负无限字符串
 // 返回值类型: Array, 返回指定范围内的元素
-func (c *Client) ZRangeByLex(key, min, max string, offset, count int64) (*Reply, error) {
+func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
 	cmd := args.Get()
-	cmd.Append("ZRANGELEX", key, min, max)
-	if count > 0 && offset >= 0 {
-		cmd.AppendArgs("LIMIT", offset, count)
+	cmd.Append("ZRANGEBYLEX", key)
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(false)
 }
 
 // ZRangeByScore v1.0.5后可用, v6.2.0开始废弃
@@ -555,19 +566,28 @@ func (c *Client) ZRangeByLex(key, min, max string, offset, count int64) (*Reply,
 // 按照分数返回[min, max]之间的元素, 元素顺序为由低到高, 如果指定了WITHSCORES参数, 同时将返回每个元素的分数
 // min和max可以是-inf和+inf, 分别表示负无穷和正无穷
 // 返回值类型: Array, 返回指定分数范围内的元素(可以选择同时返回分数)
-func (c *Client) ZRangeByScore(key string, min, max interface{}, withScore bool, offset, count int64) (*Reply, error) {
+func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+	withScore := false
 	cmd := args.Get()
 	cmd.Append("ZRANGEBYSCORE", key)
-	cmd.AppendArgs(min, max)
-	if withScore {
-		cmd.Append("WITHSCORES")
-	}
-	if count > 0 && offset >= 0 {
-		cmd.AppendArgs("LIMIT", offset, count)
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.WithScore {
+			withScore = true
+			cmd.Append("WITHSCORES")
+		}
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(withScore)
 }
 
 // ZRangeStore v6.2.0后可用
@@ -575,27 +595,29 @@ func (c *Client) ZRangeByScore(key string, min, max interface{}, withScore bool,
 // 时间复杂度: O(log(N)+M), N为有序集合中的元素数量, M为存储在dst中的元素数量
 // 与ZRANGE相似, 不同之处在于ZRANGESTORE将结果集合存储在dst中
 // 返回值类型: Integer, 返回结果有序集合中的元素数量
-func (c *Client) ZRangeStore(dst, src string, min, max interface{}, by string, rev bool, offset, count int64) (*Reply, error) {
+func (c *Client) ZRangeStore(dst, src string, option *sortedset.RangeOption) (int64, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
 	cmd.Append("ZRANGESTORE", dst, src)
-	cmd.AppendArgs(min, max)
-	switch strings.ToUpper(by) {
-	case "BYSCORE", "BYLEX":
-		cmd.Append(by)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.By != "" {
+			cmd.Append(option.By)
+		}
+		if option.Rev {
+			cmd.Append("REV")
+		}
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
 	}
-	if rev {
-		cmd.Append("REV")
+
+	reply, err := c.sendCommand(cmd.Bytes())
+	if err != nil || reply == nil {
+		return 0, err
 	}
-	if count > 0 && offset >= 0 {
-		cmd.AppendArgs("LIMIT", offset, count)
-	}
-	return c.sendCommand(cmd.Bytes())
+	return reply.Integer()
 }
 
 // ZRank v2.0.0后可用
@@ -605,13 +627,19 @@ func (c *Client) ZRangeStore(dst, src string, min, max interface{}, by string, r
 // 返回值类型:
 // 1. 如果member存在于有序集合, 返回类型为Integer: 返回member的排名
 // 2. 如果member不存在与有序集合或者key不存在, 返回nil
-func (c *Client) ZRank(key string, member interface{}) (*Reply, error) {
+func (c *Client) ZRank(key string, member interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZRANK", key)
 	cmd.AppendArgs(member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return -1, err
+	}
+
+	return reply.Integer()
 }
 
 // ZRem v1.2.0后可用
@@ -621,13 +649,18 @@ func (c *Client) ZRank(key string, member interface{}) (*Reply, error) {
 // 从key对应的有序集合中移除指定的成员, 不存在的成员将被忽略
 // 如果key对应的数据类型不是有序集合将会返回一个错误
 // 返回值类型: Integer, 返回从有序集合中移除的元素数量, 不包含不存在的元素
-func (c *Client) ZRem(key string, members ...interface{}) (*Reply, error) {
+func (c *Client) ZRem(key string, members ...interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZREM", key)
 	cmd.AppendArgs(members...)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZRemRangeByLex v2.8.9后可用
@@ -637,12 +670,53 @@ func (c *Client) ZRem(key string, members ...interface{}) (*Reply, error) {
 // min和max的含义与ZRANGEBYLEX命令相同; 同样, 如果使用相同的min和max参数调用ZRANGEBYLEX, 此命令实际上会删除相同的元素
 // 有效的min和max必须以(或[开头, 以指定范围项是分别是互斥的还是包含的; min和max的+或-的特殊值具有特殊含义或正无限和负无限字符串
 // 返回值类型: Integer, 返回被移除的元素数量
-func (c *Client) ZRemRangeByLex(key string, min, max string) (*Reply, error) {
+func (c *Client) ZRemRangeByLex(key string, min, max string) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZREMRANGEBYLEX", key, min, max)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
+}
+
+// ZRemRangeByRank v2.0.0后可用
+// 命令格式: ZREMRANGEBYRANK key start stop
+// 删除有序集合中排序在start和stop之间的成员，默认分数排名从低到高，负数的start和stop表示从分数排序从高到低
+// 返回值类型: Integer, 返回实际被移除的成员数量
+func (c *Client) ZRemRangeByRank(key string, start, stop int64) (int64, error) {
+	cmd := args.Get()
+	cmd.Append("ZREMRANGEBYRANK", key)
+	cmd.AppendArgs(start, stop)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
+}
+
+// ZRemRangeByScore v1.2.0后可用
+// 命令格式: ZREMRANGEBYSCORE key min max
+// 移除有序集合中分数在[min,max]之间的所有成员
+// 返回值类型: Integer, 返回实际被移除的成员数量
+func (c *Client) ZRemRangeByScore(key string, min, max float64) (int64, error) {
+	cmd := args.Get()
+	cmd.Append("ZREMRANGEBYSCORE", key)
+	cmd.AppendArgs(min, max)
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }
 
 // ZRevRank v2.0.0后可用
@@ -652,13 +726,91 @@ func (c *Client) ZRemRangeByLex(key string, min, max string) (*Reply, error) {
 // 返回值类型:
 // 1. 如果member存在于有序集合中, 返回Integer: 返回member的排名
 // 2. 如果member不存在或者key不存在, 返回Bulk String: nil
-func (c *Client) ZRevRank(key string, member interface{}) (*Reply, error) {
+func (c *Client) ZRevRank(key string, member interface{}) (int64, error) {
 	cmd := args.Get()
 	cmd.Append("ZREVRANK", key)
 	cmd.AppendArgs(member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
+}
+
+func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+	withScore := false
+	cmd := args.Get()
+	cmd.Append("ZREVRANGE", key)
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.WithScore {
+			withScore = true
+			cmd.Append("WITHSCORES")
+		}
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(withScore)
+}
+
+// ZRevRangeByLex v2.8.9后可用, 从v6.2.0开始被视为废弃
+// 命令格式: ZREVRANGEBYLEX key max min [LIMIT offset count]
+// 当一个有序集合中的所有元素都以相同的分数插入时，为了强制字典顺序，该命令返回有序集合中的所有元素在 key 的值在 max 和 min 之间
+// 返回值类型: Array
+func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+	cmd := args.Get()
+	cmd.Append("ZREVRANGEBYLEX", key)
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(false)
+}
+
+// ZRevRangeByScore v2.2.0后可用, v6.2.0开始被视为废弃
+// 命令格式: ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
+// 返回排序集中在 key 处的所有元素，其分数在 max 和 min 之间（包括分数等于 max 或 min 的元素）。与排序集的默认排序相反，对于此命令，元素被认为是从高到低排序的
+// 具有相同分数的元素以相反的字典顺序返回
+// 返回值类型: Array
+func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+	withScore := false
+	cmd := args.Get()
+	cmd.Append("ZREVRANGEBYSCORE", key)
+	if option != nil {
+		cmd.AppendArgs(option.Min, option.Max)
+		if option.WithScore {
+			withScore = true
+			cmd.Append("WITHSCORES")
+		}
+		if option.Offset >= 0 && option.Count > 0 {
+			cmd.AppendArgs("LIMIT", option.Offset, option.Count)
+		}
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(withScore)
 }
 
 // ZScan v2.8.0后可用
@@ -666,7 +818,7 @@ func (c *Client) ZRevRank(key string, member interface{}) (*Reply, error) {
 // 时间复杂度: O(N), N为集合中的元素数量
 // 迭代集合中的元素
 // 返回值类型: Array, 数组元素包含两个元素, 成员及其分数
-func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*Reply, error) {
+func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*sortedset.ScanResult, error) {
 	cmd := args.Get()
 	cmd.Append("ZSCAN", key)
 	cmd.AppendArgs(cursor)
@@ -678,7 +830,12 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*
 	}
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseZScanResult()
 }
 
 // ZScore v1.2.0后可用
@@ -687,13 +844,18 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*
 // 获取指定有序集合中指定成员的分数
 // 如果成员不存在, 或者key不存在, 返回nil
 // 返回值类型: Bulk String, 返回成员的分数, 因为是双精度浮点型, 所以返回的是string
-func (c *Client) ZScore(key string, member interface{}) (*Reply, error) {
+func (c *Client) ZScore(key string, member interface{}) (float64, error) {
 	cmd := args.Get()
 	cmd.Append("ZSCORE", key)
 	cmd.AppendArgs(member)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
-	return c.sendCommand(cmdBytes)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Float()
 }
 
 // ZUnion v6.2.0后可用
@@ -704,9 +866,8 @@ func (c *Client) ZScore(key string, member interface{}) (*Reply, error) {
 // 使用WEIGHTS选项, 可以为每个输入排序集指定一个乘法因子; 这意味着每个输入排序集中的每个元素的分数在传递给聚合函数之前都会乘以该因子; 未给出WEIGHTS时, 乘法因子默认为1
 // 使用AGGREGATE选项, 可以指定联合结果的聚合方式; 此选项默认为SUM, 其中元素的分数在其存在的输入中求和; 当此选项设置为MIN或MAX时, 结果集将包含元素在其存在的输入中的最小或最大分数
 // 返回值类型: Array, 返回并集的结果(如果指定了分数, 同时会返回每个成员的分数)
-func (c *Client) ZUnion(keys []string, weights []float64, op string, withScore bool) (*Reply, error) {
+func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, withScore bool) ([]sortedset.Member, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
 	cmd.Append("ZUNION")
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
@@ -716,18 +877,20 @@ func (c *Client) ZUnion(keys []string, weights []float64, op string, withScore b
 			cmd.AppendArgs(w)
 		}
 	}
-	switch strings.ToUpper(op) {
-	case "SUM", "MIN", "MAX":
-		cmd.Append("AGGREGATE", op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if aggregate != "" {
+		cmd.Append("AGGREGATE", aggregate)
 	}
 	if withScore {
 		cmd.Append("WITHSCORES")
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return nil, err
+	}
+	return reply.parseToMember(withScore)
 }
 
 // ZUnionStore v2.0.0后可用
@@ -735,9 +898,8 @@ func (c *Client) ZUnion(keys []string, weights []float64, op string, withScore b
 // 时间复杂度: O(N)+O(M*log(M)), N为指定有序集合的所有成员总数, M为结果有序集合中的元素数量
 // 计算指定有序集合的并集, 并将结果存储进dst
 // 返回值类型: Integer, 返回存储进dst中的元素数量
-func (c *Client) ZUnionStore(dst string, keys []string, weights []float64, op string) (*Reply, error) {
+func (c *Client) ZUnionStore(dst string, keys []string, weights []float64, aggregate string) (int64, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
 	cmd.Append("ZUNIONSTORE", dst)
 	cmd.AppendArgs(len(keys))
 	cmd.Append(keys...)
@@ -747,13 +909,15 @@ func (c *Client) ZUnionStore(dst string, keys []string, weights []float64, op st
 			cmd.AppendArgs(w)
 		}
 	}
-	switch strings.ToUpper(op) {
-	case "SUM", "MIN", "MAX":
-		cmd.Append("AGGREGATE", op)
-	case "":
-		break
-	default:
-		return nil, ErrInvalidArgumentFormat
+	if aggregate != "" {
+		cmd.Append("AGGREGATE", aggregate)
 	}
-	return c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	reply, err := c.sendCommand(cmdBytes)
+	if err != nil || reply == nil {
+		return 0, err
+	}
+	return reply.Integer()
 }

@@ -1,6 +1,8 @@
 package sortedset
 
 type RangeOption struct {
+	Min       interface{}
+	Max       interface{}
 	By        string
 	Rev       bool
 	Offset    int64
@@ -17,11 +19,16 @@ type AddOption struct {
 }
 
 type Member struct {
-	Score float64
 	Value interface{}
+	Score float64
 }
 
 type PopResult struct {
 	Key     string
+	Members []Member
+}
+
+type ScanResult struct {
+	Cursor  int64
 	Members []Member
 }

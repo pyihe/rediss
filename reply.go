@@ -407,6 +407,27 @@ func (reply *Reply) parseZMScore() (result []float64, err error) {
 	return
 }
 
+func (reply *Reply) parseZScanResult() (result *sortedset.ScanResult, err error) {
+	result = &sortedset.ScanResult{}
+	array := reply.Array()
+	result.Cursor, err = array[0].Integer()
+	if err != nil {
+		return
+	}
+	memArray := array[1].Array()
+	result.Members = make([]sortedset.Member, 0, len(memArray)/2)
+	for i := 0; i < len(memArray)-1; i += 2 {
+		m := sortedset.Member{}
+		m.Value = memArray[i].ValueString()
+		m.Score, err = memArray[i+1].Float()
+		if err != nil {
+			return
+		}
+		result.Members = append(result.Members, m)
+	}
+	return
+}
+
 // Just for test
 func (reply *Reply) print(prefix string) {
 	if reply == nil {
