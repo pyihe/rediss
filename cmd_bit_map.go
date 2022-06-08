@@ -33,7 +33,7 @@ func (c *Client) BitCount(key string, option *bitmap.BitOption) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -199,7 +199,7 @@ func (c *Client) BitOp(op, dst string, keys ...string) (int64, error) {
 	cmd.Append(keys...)
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -237,7 +237,7 @@ func (c *Client) BitPos(key string, bit int64, option *bitmap.BitOption) (int64,
 		}
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -257,7 +257,7 @@ func (c *Client) GetBit(key string, offset int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -278,7 +278,7 @@ func (c *Client) SetBit(key string, offset int64, value uint8) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

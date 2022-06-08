@@ -48,7 +48,7 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (int64, error)
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -80,7 +80,7 @@ func (c *Client) GeoDist(key string, member1, member2 string, unit string) (floa
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Float()
@@ -97,7 +97,7 @@ func (c *Client) GeoHash(key string, members ...string) ([]string, error) {
 	cmd.Append(members...)
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseGeoHashResult()
@@ -118,7 +118,7 @@ func (c *Client) GeoPos(key string, members ...string) ([]*geo.Location, error) 
 
 	// 获取回复
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *ge
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -249,7 +249,7 @@ func (c *Client) GeoRadius(key string, longitude, latitude float64, option *geo.
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -343,7 +343,7 @@ func (c *Client) GeoRadiusByMember(key, member string, option *geo.RadiusOption)
 		cmd.Append(option.Sort)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -428,7 +428,7 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *geo.RadiusOptio
 		cmd.Append(option.Sort)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -507,7 +507,7 @@ func (c *Client) GeoSearch(key string, option *geo.SearchOption) ([]*geo.Locatio
 		cmd.Append(option.StoreDist)
 	}
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -578,7 +578,7 @@ func (c *Client) GeoSearchStore(key string, option *geo.SearchOption) (int64, er
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

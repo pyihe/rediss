@@ -28,7 +28,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 	args.Put(cmd)
 
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseZPop()
@@ -50,7 +50,7 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (*sortedset.PopResult,
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseZPopXX()
@@ -73,7 +73,7 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*sortedset.PopResult,
 	args.Put(cmd)
 
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseZPopXX()
@@ -128,7 +128,7 @@ func (c *Client) ZCard(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -147,7 +147,7 @@ func (c *Client) ZCount(key string, min, max int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -170,7 +170,7 @@ func (c *Client) ZDiff(withScore bool, keys ...string) ([]sortedset.Member, erro
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -191,7 +191,7 @@ func (c *Client) ZDiffStore(dst string, keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -211,7 +211,7 @@ func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (flo
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Float()
@@ -246,7 +246,7 @@ func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, with
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(withScore)
@@ -269,7 +269,7 @@ func (c *Client) ZInterCard(keys []string, limit int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 
@@ -303,7 +303,7 @@ func (c *Client) ZInterStore(dst string, keys []string, weights []float64, Aggre
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 
@@ -349,7 +349,7 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*sortedset.PopRes
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -370,7 +370,7 @@ func (c *Client) ZMScore(key string, members ...interface{}) ([]float64, error) 
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -393,7 +393,7 @@ func (c *Client) ZPopMax(key string, count int64) ([]sortedset.Member, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -415,7 +415,7 @@ func (c *Client) ZPopMin(key string, count int64) ([]sortedset.Member, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -445,7 +445,7 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sorteds
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if count == 0 {
@@ -527,7 +527,7 @@ func (c *Client) ZRange(key string, option *sortedset.RangeOption) ([]sortedset.
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -554,7 +554,7 @@ func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) ([]sorte
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(false)
@@ -584,7 +584,7 @@ func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) ([]sor
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(withScore)
@@ -614,7 +614,7 @@ func (c *Client) ZRangeStore(dst, src string, option *sortedset.RangeOption) (in
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -635,7 +635,7 @@ func (c *Client) ZRank(key string, member interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return -1, err
 	}
 
@@ -657,7 +657,7 @@ func (c *Client) ZRem(key string, members ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -677,7 +677,7 @@ func (c *Client) ZRemRangeByLex(key string, min, max string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -695,7 +695,7 @@ func (c *Client) ZRemRangeByRank(key string, start, stop int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -713,7 +713,7 @@ func (c *Client) ZRemRangeByScore(key string, min, max float64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -734,7 +734,7 @@ func (c *Client) ZRevRank(key string, member interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -755,7 +755,7 @@ func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) ([]sorteds
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(withScore)
@@ -778,7 +778,7 @@ func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) ([]so
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(false)
@@ -807,7 +807,7 @@ func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) ([]
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(withScore)
@@ -832,7 +832,7 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseZScanResult()
@@ -852,7 +852,7 @@ func (c *Client) ZScore(key string, member interface{}) (float64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Float()
@@ -887,7 +887,7 @@ func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, with
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseToMember(withScore)
@@ -916,7 +916,7 @@ func (c *Client) ZUnionStore(dst string, keys []string, weights []float64, aggre
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

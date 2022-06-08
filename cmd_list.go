@@ -54,7 +54,7 @@ func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseMPopResult()
@@ -78,7 +78,7 @@ func (c *Client) BLPop(keys []string, timeout float64) (*list.BPopResult, error)
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -103,7 +103,7 @@ func (c *Client) BRPop(keys []string, timeout float64) (*list.BPopResult, error)
 	args.Put(cmd)
 
 	reply, err := c.sendCommandWithoutTimeout(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -166,7 +166,7 @@ func (c *Client) LInsert(key string, pos string, pivot, element interface{}) (in
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -184,7 +184,7 @@ func (c *Client) LLen(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -235,7 +235,7 @@ func (c *Client) LMPop(keys []string, from string, count int64) (*list.MPopResul
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseMPopResult()
@@ -260,7 +260,7 @@ func (c *Client) LPop(key string, count int64) ([]string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -302,7 +302,7 @@ func (c *Client) LPos(key string, element interface{}, option *list.PosOption) (
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseLPosResult()
@@ -322,7 +322,7 @@ func (c *Client) LPush(key string, elements ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -342,7 +342,7 @@ func (c *Client) LPushX(key string, elements ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -382,7 +382,7 @@ func (c *Client) LRem(key string, count int64, element interface{}) (int64, erro
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -401,7 +401,7 @@ func (c *Client) LSet(key string, index int64, element interface{}) (string, err
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -422,7 +422,7 @@ func (c *Client) LTrim(key string, start, stop int64) (string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -444,7 +444,7 @@ func (c *Client) RPop(key string, count int64) ([]string, error) {
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -479,7 +479,7 @@ func (c *Client) RPush(key string, elements ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -499,7 +499,7 @@ func (c *Client) RPushX(key string, elements ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

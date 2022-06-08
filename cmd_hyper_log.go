@@ -19,7 +19,7 @@ func (c *Client) PFAdd(key string, elements ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -40,7 +40,7 @@ func (c *Client) PFCount(keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -60,7 +60,7 @@ func (c *Client) PFMerge(dst string, srcs ...string) (string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil

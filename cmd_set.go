@@ -20,7 +20,7 @@ func (c *Client) SAdd(key string, members ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 
@@ -39,7 +39,7 @@ func (c *Client) SCard(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -72,7 +72,7 @@ func (c *Client) SDiffStore(dst string, keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -112,7 +112,7 @@ func (c *Client) SInterCard(keys []string, limit int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -132,7 +132,7 @@ func (c *Client) SInterStore(dst string, keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -151,7 +151,7 @@ func (c *Client) SIsMember(key string, member interface{}) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 
@@ -184,7 +184,7 @@ func (c *Client) SMIsMember(key string, members ...interface{}) ([]bool, error) 
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseIsMember()
@@ -206,7 +206,7 @@ func (c *Client) SMove(src, dst string, member interface{}) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 
@@ -272,7 +272,7 @@ func (c *Client) SRem(key string, members ...interface{}) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -298,7 +298,7 @@ func (c *Client) SScan(key string, cursor int64, option *set.ScanOption) (*set.S
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -333,7 +333,7 @@ func (c *Client) SUnionStore(dst string, keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

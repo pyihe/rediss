@@ -21,7 +21,7 @@ func (c *Client) HDel(key string, fields ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -39,7 +39,7 @@ func (c *Client) HExists(key string, field string) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdbytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 	return reply.Bool()
@@ -70,7 +70,7 @@ func (c *Client) HGetAll(key string) (hash.FieldValue, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -92,7 +92,7 @@ func (c *Client) HIncrBy(key string, field string, increment int64) (int64, erro
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -113,7 +113,7 @@ func (c *Client) HIncrByFloat(key string, field string, increment float64) (floa
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Float()
@@ -131,7 +131,7 @@ func (c *Client) HKeys(key string) ([]string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseHKeysResult()
@@ -149,7 +149,7 @@ func (c *Client) HLen(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -210,7 +210,7 @@ func (c *Client) HRandField(key string, count int64, withValues bool) (hash.Fiel
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	if err = reply.Error(); err != nil {
@@ -237,7 +237,7 @@ func (c *Client) HScan(key string, cursor int, pattern string, count int64) (res
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return
 	}
 	if err = reply.Error(); err != nil {
@@ -263,7 +263,7 @@ func (c *Client) HSet(key string, fvs hash.FieldValue) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -282,7 +282,7 @@ func (c *Client) HSetNX(key string, field string, value interface{}) (bool, erro
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 	return reply.Bool()
@@ -300,7 +300,7 @@ func (c *Client) HStrLen(key string, field string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()

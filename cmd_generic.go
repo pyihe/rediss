@@ -81,7 +81,7 @@ func (c *Client) Copy(src, dst string, dstDB int, replace bool) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 	return reply.Bool()
@@ -162,7 +162,7 @@ func (c *Client) Migrate(option *generic.MigrateOption) (string, error) {
 	}
 
 	reply, err := c.sendCommand(cmd.Bytes())
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -186,7 +186,7 @@ func (c *Client) ObjectEncoding(key string) (string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -205,7 +205,7 @@ func (c *Client) ObjectFreq(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -237,7 +237,7 @@ func (c *Client) ObjectIdleTime(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -255,7 +255,7 @@ func (c *Client) ObjectRefCount(key string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -296,7 +296,7 @@ func (c *Client) Restore(key string, value string, option *generic.RestoreOption
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -383,7 +383,7 @@ func (c *Client) Touch(keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -403,7 +403,7 @@ func (c *Client) Unlink(keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -428,7 +428,7 @@ func (c *Client) Wait(numRep int64, timeout int64) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -448,7 +448,7 @@ func (c *Client) Del(keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -492,7 +492,7 @@ func (c *Client) Exists(keys ...string) (int64, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return 0, err
 	}
 	return reply.Integer()
@@ -692,7 +692,7 @@ func (c *Client) Keys(pattern string) ([]string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 	return reply.parseKeysResult()
@@ -785,7 +785,7 @@ func (c *Client) RandomKey() (string, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), nil
@@ -805,7 +805,7 @@ func (c *Client) Rename(key, newKey string) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 	return reply.Bool()
@@ -824,7 +824,7 @@ func (c *Client) RenameNX(key, newKey string) (bool, error) {
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return false, err
 	}
 	return reply.Bool()
@@ -861,7 +861,7 @@ func (c *Client) Scan(cursor int, option *generic.ScanOption) (result *generic.S
 	args.Put(cmd)
 
 	reply, err := c.sendCommand(cmdBytes)
-	if err != nil || reply == nil {
+	if err != nil {
 		return nil, err
 	}
 
