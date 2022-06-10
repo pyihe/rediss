@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -139,7 +138,7 @@ func (p *Pool) periodicClean(ctx context.Context) {
 
 		// 关闭已经过期的连接
 		for i := range expiredConns {
-			fmt.Printf("断开连接: %v, %v\n", expiredConns[i].conn.LocalAddr(), expiredConns[i].conn.RemoteAddr())
+			//fmt.Printf("断开连接: %v, %v\n", expiredConns[i].conn.LocalAddr(), expiredConns[i].conn.RemoteAddr())
 			expiredConns[i].conn.Close()
 			expiredConns[i] = nil
 		}

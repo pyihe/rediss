@@ -2,6 +2,7 @@ package pool
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -75,7 +76,10 @@ func (rc *RedisConn) ReadLine(timeout time.Duration) (line []byte, err error) {
 		full = append(full, line...)
 		line = full
 	}
-	return
+	if len(line) <= 2 || line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
+		return nil, fmt.Errorf("redis: invalid reply: %q", line)
+	}
+	return line[:len(line)-2], nil
 }
 
 func (rc *RedisConn) ReadReply(timeout time.Duration) (reply *Reply, err error) {

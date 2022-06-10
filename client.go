@@ -1,6 +1,7 @@
 package rediss
 
 import (
+	"net"
 	"time"
 
 	"github.com/pyihe/go-pkg/serialize"
@@ -31,6 +32,9 @@ func New(opts ...Option) *Client {
 
 	for _, opt := range opts {
 		opt(c)
+	}
+	c.poolConfig.Dialer = func() (net.Conn, error) {
+		return net.Dial("tcp", c.address)
 	}
 	c.pool = pool.New(c.poolConfig)
 
@@ -72,6 +76,7 @@ func (c *Client) checkConn(conn *pool.RedisConn) error {
 	if err != nil {
 		return err
 	}
+	_, _ = conn.ReadReply(0)
 	if len(c.password) > 0 {
 		var cmd []byte
 		if len(c.username) > 0 {
@@ -82,7 +87,9 @@ func (c *Client) checkConn(conn *pool.RedisConn) error {
 		if _, err = conn.WriteBytes(cmd, 0); err != nil {
 			return err
 		}
+		_, _ = conn.ReadReply(0)
 	}
 	_, err = conn.WriteBytes(args.Command("SELECT", c.database), 0)
+	_, _ = conn.ReadReply(0)
 	return err
 }

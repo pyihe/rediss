@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/pyihe/go-pkg/errors"
@@ -41,11 +40,11 @@ func (q *queue) insert(conn *RedisConn) (err error) {
 		q.conns[length-1] = nil
 		q.conns = q.conns[:n]
 		_ = oldConn.conn.Close()
-		fmt.Printf("队列已满, 需要替换旧连接: %v->%v\n", oldConn.conn.LocalAddr(), conn.conn.LocalAddr())
+		//fmt.Printf("队列已满, 需要替换旧连接: %v->%v\n", oldConn.conn.LocalAddr(), conn.conn.LocalAddr())
 	}
 
 	q.conns = append(q.conns, conn)
-	fmt.Printf("insert连接[%v]后: %v\n", conn.conn.LocalAddr(), q.len())
+	//fmt.Printf("insert连接[%v]后: %v\n", conn.conn.LocalAddr(), q.len())
 	return
 }
 
@@ -57,7 +56,7 @@ func (q *queue) pop() *RedisConn {
 	c := q.conns[length-1]
 	q.conns[length-1] = nil
 	q.conns = q.conns[:length-1]
-	fmt.Printf("获取连接: %v\n", c.conn.LocalAddr())
+	//fmt.Printf("获取连接: %v\n", c.conn.LocalAddr())
 	return c
 }
 
@@ -97,7 +96,7 @@ func (q *queue) searchExpiredConns(expire time.Duration) []*RedisConn {
 		q.conns[i] = nil
 	}
 	q.conns = q.conns[:n]
-	fmt.Printf("xxx: %v, %v, %v, %v\n", len(q.expired), q.expired[len(q.expired)-1].lastUsedTime.String(), now.String(), expire)
+	//fmt.Printf("xxx: %v, %v, %v, %v\n", len(q.expired), q.expired[len(q.expired)-1].lastUsedTime.String(), now.String(), expire)
 	return q.expired
 }
 
