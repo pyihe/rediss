@@ -77,7 +77,7 @@ func (rc *RedisConn) ReadLine(timeout time.Duration) (line []byte, err error) {
 		line = full
 	}
 	if len(line) <= 2 || line[len(line)-1] != '\n' || line[len(line)-2] != '\r' {
-		return nil, fmt.Errorf("redis: invalid reply: %q", line)
+		return nil, fmt.Errorf("read invalid reply: %q", line)
 	}
 	return line[:len(line)-2], nil
 }
