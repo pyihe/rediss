@@ -3,6 +3,7 @@ package rediss
 import (
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/sortedset"
+	"github.com/pyihe/rediss/pool"
 )
 
 // BZMPop v7.0.0后可用
@@ -14,7 +15,7 @@ import (
 // 返回值类型: Array, 如果没有成员可以pop时返回nil,
 // 否则将返回双元素数组, 第一个元素是有序集合的名称, 第二个元素是一个数组, 为从该有序集合中pop出的元素组成,
 // 每个元素同样也是一个包含成员以及它的分数的数组
-func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) (*sortedset.PopResult, error) {
+func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) (result *sortedset.PopResult, err error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 	cmd.Append("BZMPOP")
@@ -31,7 +32,23 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseZPop()
+
+	array := reply.Array()
+	result = &sortedset.PopResult{}
+	result.Key = array[0].ValueString()
+	memberArray := array[1].Array()
+	result.Members = make([]sortedset.Member, 0, len(memberArray))
+	for _, mem := range memberArray {
+		pm := mem.Array()
+		m := sortedset.Member{}
+		m.Value = pm[0].ValueString()
+		m.Score, err = pm[1].Float()
+		if err != nil {
+			return nil, err
+		}
+		result.Members = append(result.Members, m)
+	}
+	return
 }
 
 // BZPopMax v5.0.0后可用
@@ -42,7 +59,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 // 返回值类型: Array, 没有元素可以pop或者超时时, 返回nil
 // 三元素, 第一个元素为pop元素的有序集合名字, 第二个元素为它本身, 第三个元素为被pop元素的分数
 // v6.0.0后开始timeout由整型变为双精度浮点型
-func (c *Client) BZPopMax(keys []string, timeout float64) (*sortedset.PopResult, error) {
+func (c *Client) BZPopMax(keys []string, timeout float64) (result *sortedset.PopResult, err error) {
 	cmd := args.Get()
 	cmd.Append("BZPOPMAX")
 	cmd.Append(keys...)
@@ -53,7 +70,17 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (*sortedset.PopResult,
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseZPopXX()
+
+	array := reply.Array()
+	result = &sortedset.PopResult{
+		Members: make([]sortedset.Member, 1),
+	}
+	result.Key = array[0].ValueString()
+	member := sortedset.Member{}
+	member.Value = array[1].ValueString()
+	member.Score, err = array[2].Float()
+	result.Members[0] = member
+	return
 }
 
 // BZPopMin v5.0.0后可用
@@ -64,7 +91,7 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (*sortedset.PopResult,
 // 返回值类型: Array, 没有元素可以pop或者超时时, 返回nil
 // 三元素, 第一个元素为pop元素的有序集合名字, 第二个元素为它本身, 第三个元素为被pop元素的分数
 // v6.0.0后开始timeout由整型变为双精度浮点型
-func (c *Client) BZPopMin(keys []string, timeout float64) (*sortedset.PopResult, error) {
+func (c *Client) BZPopMin(keys []string, timeout float64) (result *sortedset.PopResult, err error) {
 	cmd := args.Get()
 	cmd.Append("BZPOPMIN")
 	cmd.Append(keys...)
@@ -76,7 +103,17 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*sortedset.PopResult,
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseZPopXX()
+
+	array := reply.Array()
+	result = &sortedset.PopResult{
+		Members: make([]sortedset.Member, 1),
+	}
+	result.Key = array[0].ValueString()
+	member := sortedset.Member{}
+	member.Value = array[1].ValueString()
+	member.Score, err = array[2].Float()
+	result.Members[0] = member
+	return
 }
 
 // ZAdd v1.2.0后可用
@@ -91,7 +128,7 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (*sortedset.PopResult,
 // 当没有提供可选参数时, 返回新增元素的个数, 通过Reply.Integer获取结果
 // 如果指定了CH参数, 返回新增以及更新的元素个数, 通过Reply.Integer获取结果
 // 如果提供了INCR参数, 返回值将会变为Bulk String, 返回成员的新分数(双精度浮点数)表示为字符串，如果操作被中止（当使用 XX 或 NX 选项调用时），则为 nil, 通过Reply.ValueString获取结果
-func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*Reply, error) {
+func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*pool.Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -158,7 +195,7 @@ func (c *Client) ZCount(key string, min, max int64) (int64, error) {
 // 时间复杂度: O(L + (N-K)log(N)), L为所有有序集合的成员总数, N为第一个有序集合的成员数量, K为结果集合的成员数量
 // 获取给定的第一个集合和后续集合之间的差集
 // 返回值类型: Array, 返回差异成员(如果提供了WITHSCORES参数, 则会携带分数)
-func (c *Client) ZDiff(withScore bool, keys ...string) ([]sortedset.Member, error) {
+func (c *Client) ZDiff(withScore bool, keys ...string) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZDIFF")
 	cmd.AppendArgs(len(keys))
@@ -174,7 +211,27 @@ func (c *Client) ZDiff(withScore bool, keys ...string) ([]sortedset.Member, erro
 		return nil, err
 	}
 
-	return reply.parseToMember(withScore)
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZDiffStore v6.2.0后可用
@@ -225,7 +282,7 @@ func (c *Client) ZIncrBy(key string, increment float64, member interface{}) (flo
 // 使用WEIGHTS选项, 可以为每个输入排序集指定一个乘法因子, 即每个有序集合的每个元素的分数在传递给聚合函数之前都会乘以该因子; 当未给出WEIGHTS时, 乘法因子默认为1
 // 使用AGGREGATE选项，可以指定联合结果的聚合方式, 此选项默认为SUM, 即并集中元素的分数为所有有序集合中的总和, 当此选项设置为MIN或MAX时, 结果集将包含元素在所有有序集合中的最小或最大分数
 // 返回值类型: Array, 交集的结果(如果给出了WITHSCORES选项, 则可以选择它们的分数)
-func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, withScore bool) ([]sortedset.Member, error) {
+func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, withScore bool) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZINTER")
 	cmd.AppendArgs(len(keys))
@@ -249,7 +306,28 @@ func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, with
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(withScore)
+
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZInterCard v7.0.0开始可用
@@ -336,7 +414,7 @@ func (c *Client) ZLexCount(key string, min, max string) (int64, error) {
 // 当指定MIN参数时, 弹出的元素是第一个非空排序集中得分最低的元素; MAX参数使得分最高的元素被弹出
 // COUNT指定需要pop的元素数量, 默认为1
 // 返回值类型: Array, 如果没有元素可以pop时返回nil; 有元素可以pop时返回一个双元素的数组, 第一个元素为有序集合名称, 第二个元素为成员-分数的数组
-func (c *Client) ZMPop(keys []string, op string, count int64) (*sortedset.PopResult, error) {
+func (c *Client) ZMPop(keys []string, op string, count int64) (result *sortedset.PopResult, err error) {
 	cmd := args.Get()
 	cmd.Append("ZMPOP")
 	cmd.AppendArgs(len(keys))
@@ -353,7 +431,22 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*sortedset.PopRes
 		return nil, err
 	}
 
-	return reply.parseZPop()
+	array := reply.Array()
+	result = &sortedset.PopResult{}
+	result.Key = array[0].ValueString()
+	memberArray := array[1].Array()
+	result.Members = make([]sortedset.Member, 0, len(memberArray))
+	for _, mem := range memberArray {
+		pm := mem.Array()
+		m := sortedset.Member{}
+		m.Value = pm[0].ValueString()
+		m.Score, err = pm[1].Float()
+		if err != nil {
+			return nil, err
+		}
+		result.Members = append(result.Members, m)
+	}
+	return
 }
 
 // ZMScore v6.2.0后可用
@@ -362,7 +455,7 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (*sortedset.PopRes
 // 获取有序集合key中指定成员的分数
 // 对于每个不存在的成员, 返回nil
 // 返回值类型: Array, 与成员关联的分数或者nil列表
-func (c *Client) ZMScore(key string, members ...interface{}) ([]float64, error) {
+func (c *Client) ZMScore(key string, members ...interface{}) (result []float64, err error) {
 	cmd := args.Get()
 	cmd.Append("ZMSCORE", key)
 	cmd.AppendArgs(members...)
@@ -374,7 +467,18 @@ func (c *Client) ZMScore(key string, members ...interface{}) ([]float64, error) 
 		return nil, err
 	}
 
-	return reply.parseZMScore()
+	array := reply.Array()
+	result = make([]float64, len(array))
+	for i := 0; i < len(array); i++ {
+		if array[i] == nil {
+			continue
+		}
+		result[i], err = array[i].Float()
+		if err != nil {
+			break
+		}
+	}
+	return
 }
 
 // ZPopMax v5.0.0后可用
@@ -383,7 +487,7 @@ func (c *Client) ZMScore(key string, members ...interface{}) ([]float64, error) 
 // 从指定的有序集合中移除并且返回count个分数最高的成员
 // 如果没有指定count, count默认值为1; 如果count值大于有序集合的基数将不会产生错误, 当返回多个元素时, 将会根据分数由高到低的pop
 // 返回值类型: Array, 返回成员和分数的数组
-func (c *Client) ZPopMax(key string, count int64) ([]sortedset.Member, error) {
+func (c *Client) ZPopMax(key string, count int64) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZPOPMAX", key)
 	if count > 1 {
@@ -397,7 +501,18 @@ func (c *Client) ZPopMax(key string, count int64) ([]sortedset.Member, error) {
 		return nil, err
 	}
 
-	return reply.parseToMember(true)
+	array := reply.Array()
+	result = make([]sortedset.Member, 0, len(array)/2)
+	for i := 0; i < len(array)-1; i += 2 {
+		m := sortedset.Member{}
+		m.Value = array[i].ValueString()
+		m.Score, err = array[i+1].Float()
+		if err != nil {
+			return
+		}
+		result = append(result, m)
+	}
+	return
 }
 
 // ZPopMin v5.0.0后可用
@@ -405,7 +520,7 @@ func (c *Client) ZPopMax(key string, count int64) ([]sortedset.Member, error) {
 // 时间复杂度: O(log(N)*M), N为有序集合中的元素数量, M为被pop的元素数量
 // 与ZPOPMAX相似, 不同之处在于ZPOPMIN返回的是分数由低到高的count个元素
 // 返回值类型: Array, 返回成员和分数的数组
-func (c *Client) ZPopMin(key string, count int64) ([]sortedset.Member, error) {
+func (c *Client) ZPopMin(key string, count int64) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZPOPMIN", key)
 	if count > 1 {
@@ -419,7 +534,18 @@ func (c *Client) ZPopMin(key string, count int64) ([]sortedset.Member, error) {
 		return nil, err
 	}
 
-	return reply.parseToMember(true)
+	array := reply.Array()
+	result = make([]sortedset.Member, 0, len(array)/2)
+	for i := 0; i < len(array)-1; i += 2 {
+		m := sortedset.Member{}
+		m.Value = array[i].ValueString()
+		m.Score, err = array[i+1].Float()
+		if err != nil {
+			return
+		}
+		result = append(result, m)
+	}
+	return
 }
 
 // ZRandMember v6.2.0后可用
@@ -454,7 +580,7 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sorteds
 	}
 
 	var result []sortedset.Member
-	var array = reply.array
+	var array = reply.Array()
 	if !withScore {
 		result = make([]sortedset.Member, 0, len(array))
 		for i := 0; i < len(array); i++ {
@@ -503,7 +629,7 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sorteds
 // REV选项颠倒<start>和<stop>元素的顺序, 其中<start>必须按字典顺序大于<stop>才能产生非空结果
 //
 // 返回值类型: Array, 返回由有序集合元素组成的数组
-func (c *Client) ZRange(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRange(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	withScore := false
 	cmd := args.Get()
 	cmd.Append("ZRANGE", key)
@@ -531,7 +657,27 @@ func (c *Client) ZRange(key string, option *sortedset.RangeOption) ([]sortedset.
 		return nil, err
 	}
 
-	return reply.parseToMember(withScore)
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZRangeByLex v2.8.9后可用, v6.2.0后废弃
@@ -541,7 +687,7 @@ func (c *Client) ZRange(key string, option *sortedset.RangeOption) ([]sortedset.
 // 如果有序集合中所有的成员分数相同, 此命令按照字典序返回min和max之间的元素
 // 有效的start和stop必须以(或[开头, 以指定范围项是分别是互斥的还是包含的; start和stop的+或-的特殊值具有特殊含义或正无限和负无限字符串
 // 返回值类型: Array, 返回指定范围内的元素
-func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZRANGEBYLEX", key)
 	if option != nil {
@@ -557,7 +703,14 @@ func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) ([]sorte
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(false)
+
+	array := reply.Array()
+	result = make([]sortedset.Member, 0, len(array))
+	for _, ele := range array {
+		m := sortedset.Member{Value: ele.ValueString()}
+		result = append(result, m)
+	}
+	return
 }
 
 // ZRangeByScore v1.0.5后可用, v6.2.0开始废弃
@@ -566,7 +719,7 @@ func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) ([]sorte
 // 按照分数返回[min, max]之间的元素, 元素顺序为由低到高, 如果指定了WITHSCORES参数, 同时将返回每个元素的分数
 // min和max可以是-inf和+inf, 分别表示负无穷和正无穷
 // 返回值类型: Array, 返回指定分数范围内的元素(可以选择同时返回分数)
-func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	withScore := false
 	cmd := args.Get()
 	cmd.Append("ZRANGEBYSCORE", key)
@@ -587,7 +740,28 @@ func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) ([]sor
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(withScore)
+
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZRangeStore v6.2.0后可用
@@ -740,7 +914,7 @@ func (c *Client) ZRevRank(key string, member interface{}) (int64, error) {
 	return reply.Integer()
 }
 
-func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	withScore := false
 	cmd := args.Get()
 	cmd.Append("ZREVRANGE", key)
@@ -758,14 +932,35 @@ func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) ([]sorteds
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(withScore)
+
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZRevRangeByLex v2.8.9后可用, 从v6.2.0开始被视为废弃
 // 命令格式: ZREVRANGEBYLEX key max min [LIMIT offset count]
 // 当一个有序集合中的所有元素都以相同的分数插入时，为了强制字典顺序，该命令返回有序集合中的所有元素在 key 的值在 max 和 min 之间
 // 返回值类型: Array
-func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZREVRANGEBYLEX", key)
 	if option != nil {
@@ -781,7 +976,14 @@ func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) ([]so
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(false)
+
+	array := reply.Array()
+	result = make([]sortedset.Member, 0, len(array))
+	for _, ele := range array {
+		m := sortedset.Member{Value: ele.ValueString()}
+		result = append(result, m)
+	}
+	return
 }
 
 // ZRevRangeByScore v2.2.0后可用, v6.2.0开始被视为废弃
@@ -789,7 +991,7 @@ func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) ([]so
 // 返回排序集中在 key 处的所有元素，其分数在 max 和 min 之间（包括分数等于 max 或 min 的元素）。与排序集的默认排序相反，对于此命令，元素被认为是从高到低排序的
 // 具有相同分数的元素以相反的字典顺序返回
 // 返回值类型: Array
-func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) ([]sortedset.Member, error) {
+func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) (result []sortedset.Member, err error) {
 	withScore := false
 	cmd := args.Get()
 	cmd.Append("ZREVRANGEBYSCORE", key)
@@ -810,7 +1012,28 @@ func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) ([]
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(withScore)
+
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZScan v2.8.0后可用
@@ -818,7 +1041,7 @@ func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) ([]
 // 时间复杂度: O(N), N为集合中的元素数量
 // 迭代集合中的元素
 // 返回值类型: Array, 数组元素包含两个元素, 成员及其分数
-func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*sortedset.ScanResult, error) {
+func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (result *sortedset.ScanResult, err error) {
 	cmd := args.Get()
 	cmd.Append("ZSCAN", key)
 	cmd.AppendArgs(cursor)
@@ -835,7 +1058,25 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (*
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseZScanResult()
+
+	result = &sortedset.ScanResult{}
+	array := reply.Array()
+	result.Cursor, err = array[0].Integer()
+	if err != nil {
+		return
+	}
+	memArray := array[1].Array()
+	result.Members = make([]sortedset.Member, 0, len(memArray)/2)
+	for i := 0; i < len(memArray)-1; i += 2 {
+		m := sortedset.Member{}
+		m.Value = memArray[i].ValueString()
+		m.Score, err = memArray[i+1].Float()
+		if err != nil {
+			return
+		}
+		result.Members = append(result.Members, m)
+	}
+	return
 }
 
 // ZScore v1.2.0后可用
@@ -866,7 +1107,7 @@ func (c *Client) ZScore(key string, member interface{}) (float64, error) {
 // 使用WEIGHTS选项, 可以为每个输入排序集指定一个乘法因子; 这意味着每个输入排序集中的每个元素的分数在传递给聚合函数之前都会乘以该因子; 未给出WEIGHTS时, 乘法因子默认为1
 // 使用AGGREGATE选项, 可以指定联合结果的聚合方式; 此选项默认为SUM, 其中元素的分数在其存在的输入中求和; 当此选项设置为MIN或MAX时, 结果集将包含元素在其存在的输入中的最小或最大分数
 // 返回值类型: Array, 返回并集的结果(如果指定了分数, 同时会返回每个成员的分数)
-func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, withScore bool) ([]sortedset.Member, error) {
+func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, withScore bool) (result []sortedset.Member, err error) {
 	cmd := args.Get()
 	cmd.Append("ZUNION")
 	cmd.AppendArgs(len(keys))
@@ -890,7 +1131,27 @@ func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, with
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseToMember(withScore)
+	array := reply.Array()
+	switch withScore {
+	case true:
+		result = make([]sortedset.Member, 0, len(array)/2)
+		for i := 0; i < len(array)-1; i += 2 {
+			m := sortedset.Member{}
+			m.Value = array[i].ValueString()
+			m.Score, err = array[i+1].Float()
+			if err != nil {
+				return
+			}
+			result = append(result, m)
+		}
+	default:
+		result = make([]sortedset.Member, 0, len(array))
+		for _, ele := range array {
+			m := sortedset.Member{Value: ele.ValueString()}
+			result = append(result, m)
+		}
+	}
+	return
 }
 
 // ZUnionStore v2.0.0后可用

@@ -32,12 +32,6 @@ func WithDatabase(db int) Option {
 	}
 }
 
-func WithPoolSize(size int) Option {
-	return func(client *Client) {
-		client.poolSize = size
-	}
-}
-
 func WithSerializer(serializer serialize.Serializer) Option {
 	return func(client *Client) {
 		client.serializer = serializer
@@ -53,5 +47,29 @@ func WithWriteTimeout(timeout time.Duration) Option {
 func WithReadTimeout(timeout time.Duration) Option {
 	return func(client *Client) {
 		client.readTimeout = timeout
+	}
+}
+
+func WithMaxIdleTime(idleTime time.Duration) Option {
+	return func(client *Client) {
+		client.poolConfig.MaxIdleTime = idleTime
+	}
+}
+
+func WithRetry(retry int) Option {
+	return func(client *Client) {
+		client.poolConfig.Retry = retry
+	}
+}
+
+func WithPoolSize(size int) Option {
+	return func(client *Client) {
+		client.poolConfig.MaxConnSize = size
+	}
+}
+
+func WithMinConnNum(num int) Option {
+	return func(c *Client) {
+		c.poolConfig.MinConnSize = num
 	}
 }

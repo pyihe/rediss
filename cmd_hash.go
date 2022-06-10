@@ -5,6 +5,7 @@ import (
 
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/hash"
+	"github.com/pyihe/rediss/pool"
 )
 
 // HDel v2.0.0后可用
@@ -50,7 +51,7 @@ func (c *Client) HExists(key string, field string) (bool, error) {
 // 时间复杂度:O(1)
 // 获取hash字段的值
 // 返回值类型: Bulk String, key和field同时存在返回字段值, 否则返回nil
-func (c *Client) HGet(key string, field string) (*Reply, error) {
+func (c *Client) HGet(key string, field string) (*pool.Reply, error) {
 	cmd := args.Get()
 	cmd.Append("HGET", key, field)
 	cmdBytes := cmd.Bytes()
@@ -63,7 +64,7 @@ func (c *Client) HGet(key string, field string) (*Reply, error) {
 // 时间复杂度: O(N), N为hash的大小
 // 获取key对应hash的所有field和value
 // 返回值类型: Array, <field, value>的列表, 或者空列表(如果key不存在)
-func (c *Client) HGetAll(key string) (hash.FieldValue, error) {
+func (c *Client) HGetAll(key string) (result hash.FieldValue, err error) {
 	cmd := args.Get()
 	cmd.Append("HGETALL", key)
 	cmdBytes := cmd.Bytes()
@@ -76,7 +77,15 @@ func (c *Client) HGetAll(key string) (hash.FieldValue, error) {
 	if err = reply.Error(); err != nil {
 		return nil, err
 	}
-	return reply.parseHGetAllResult()
+
+	result = hash.NewFieldValue()
+	var fieldArray = reply.Array()
+	for i := 0; i < len(fieldArray)-1; i += 2 {
+		field := fieldArray[i].ValueString()
+		value := fieldArray[i+1].Bytes()
+		result.Set(field, value)
+	}
+	return
 }
 
 // HIncrBy v2.0.0后可用
@@ -124,7 +133,7 @@ func (c *Client) HIncrByFloat(key string, field string, increment float64) (floa
 // 时间复杂度: O(N), N为hash的大小
 // 获取存储在key中的hash值的所有的字段
 // 返回值类型: Array, 返回hash字段的列表, 如果key不存在则返回空列表
-func (c *Client) HKeys(key string) ([]string, error) {
+func (c *Client) HKeys(key string) (result []string, err error) {
 	cmd := args.Get()
 	cmd.Append("HKEYS", key)
 	cmdBytes := cmd.Bytes()
@@ -134,7 +143,13 @@ func (c *Client) HKeys(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseHKeysResult()
+
+	array := reply.Array()
+	result = make([]string, 0, len(array))
+	for _, v := range array {
+		result = append(result, v.ValueString())
+	}
+	return
 }
 
 // HLen v2.0.0后可用
@@ -160,7 +175,7 @@ func (c *Client) HLen(key string) (int64, error) {
 // 时间复杂度: O(N), N为请求的field数量
 // 获取hash中指定字段的值, 对于每个指定但不存在的field, 将会返回一个nil
 // 返回值类型: Array, 返回field值的列表, 返回顺序与请求顺序一致
-func (c *Client) HMGet(key string, field ...string) (*Reply, error) {
+func (c *Client) HMGet(key string, field ...string) (*pool.Reply, error) {
 	cmd := args.Get()
 	cmd.Append("HMGET", key)
 	cmd.Append(field...)
@@ -174,7 +189,7 @@ func (c *Client) HMGet(key string, field ...string) (*Reply, error) {
 // 时间复杂度: O(N), N为设置键值对的数量
 // 设置多个hash的<field, value>键值对, 对于已经存在的field字段, 其值将被覆盖, 如果key不存在, 将会创建一个key并赋值
 // 返回值类型: Simple String
-func (c *Client) HMSet(key string, fvs hash.FieldValue) (*Reply, error) {
+func (c *Client) HMSet(key string, fvs hash.FieldValue) (*pool.Reply, error) {
 	cmd := args.Get()
 	cmd.Append("HMSET", key)
 	fvs.Range(func(key string, value interface{}) (breakOut bool) {
@@ -197,7 +212,7 @@ func (c *Client) HMSet(key string, fvs hash.FieldValue) (*Reply, error) {
 // 返回值类型:
 // 1. Bulk String: 如果没有指定count参数, 则命令返回一个随机字段, 如果key不存在则返回nil
 // 2. Array: 如果指定了count参数, 命令返回字段的数组, 如果key不存在则返回空的数组; 如果使用了WITHVALUES, 返回值将会是字段和值的数组
-func (c *Client) HRandField(key string, count int64, withValues bool) (hash.FieldValue, error) {
+func (c *Client) HRandField(key string, count int64, withValues bool) (result hash.FieldValue, err error) {
 	cmd := args.Get()
 	cmd.Append("HRANDFIELD", key)
 	if count != 0 {
@@ -216,7 +231,26 @@ func (c *Client) HRandField(key string, count int64, withValues bool) (hash.Fiel
 	if err = reply.Error(); err != nil {
 		return nil, err
 	}
-	return reply.parseHRandFieldResult(count, withValues)
+
+	result = hash.NewFieldValue()
+	switch count {
+	case 0:
+		result.Set(reply.ValueString(), nil)
+	default:
+		array := reply.Array()
+		if withValues {
+			for i := 0; i < len(array)-1; i += 2 {
+				field := array[i].ValueString()
+				value := array[i+1].Bytes()
+				result.Set(field, value)
+			}
+		} else {
+			for _, k := range array {
+				result.Set(k.ValueString(), nil)
+			}
+		}
+	}
+	return
 }
 
 // HScan v2.8.0后可用
@@ -243,7 +277,20 @@ func (c *Client) HScan(key string, cursor int, pattern string, count int64) (res
 	if err = reply.Error(); err != nil {
 		return
 	}
-	return reply.parseHScanResult()
+
+	var array = reply.Array()
+	if len(array) != 2 {
+		return
+	}
+	var fvArray = array[1].Array()
+	result = &hash.ScanResult{FieldValues: hash.NewFieldValue()}
+	result.Cursor, _ = array[0].Integer()
+	for i := 0; i < len(fvArray)-1; i += 2 {
+		field := fvArray[i].ValueString()
+		value := fvArray[i+1].ValueString()
+		result.FieldValues.Set(field, value)
+	}
+	return
 }
 
 // HSet v2.0.0后可用
@@ -311,7 +358,7 @@ func (c *Client) HStrLen(key string, field string) (int64, error) {
 // 时间复杂度: O(N)
 // 获取hash所有字段对应的值
 // 返回值类型: Array, 返回key对应所有字段值的列表
-func (c *Client) HVals(key string) (*Reply, error) {
+func (c *Client) HVals(key string) (*pool.Reply, error) {
 	cmd := args.Get()
 	cmd.Append("HVALS", key)
 	cmdBytes := cmd.Bytes()

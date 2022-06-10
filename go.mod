@@ -10,3 +10,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 )
+
+replace (
+	github.com/pyihe/go-pkg v0.0.0-20220526091214-2ae61155310d => ../go-pkg
+)

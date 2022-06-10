@@ -8,6 +8,7 @@ import (
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/generic"
+	"github.com/pyihe/rediss/pool"
 )
 
 // Ping v1.0.0后可用
@@ -216,7 +217,7 @@ func (c *Client) ObjectFreq(key string) (int64, error) {
 // 时间复杂度: O(1)
 // OBJECT HELP 命令返回描述不同子命令的有用文本
 // 返回值类型: Array, 返回子命令和它们的描述的数组
-func (c *Client) ObjectHelp() (*Reply, error) {
+func (c *Client) ObjectHelp() (*pool.Reply, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "HELP")
 	cmdBytes := cmd.Bytes()
@@ -309,7 +310,7 @@ func (c *Client) Restore(key string, value string, option *generic.RestoreOption
 // 返回值类型:
 // 1. 没有传递store参数, 返回排序后元素的列表
 // 2. 如果指明了store参数, 返回存储在dst列表中的元素数量
-func (c *Client) Sort(key string, option *generic.SortOption) (*Reply, error) {
+func (c *Client) Sort(key string, option *generic.SortOption) (*pool.Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -340,7 +341,7 @@ func (c *Client) Sort(key string, option *generic.SortOption) (*Reply, error) {
 
 // SortRo v7.0.0后可用
 // Sort的只读版本
-func (c *Client) SortRo(key string, option *generic.SortOption) (*Reply, error) {
+func (c *Client) SortRo(key string, option *generic.SortOption) (*pool.Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -685,7 +686,7 @@ func (c *Client) PExpireTime(key string) (int64, error) {
 // 时间复杂度: O(N), N为数据库中的key数量
 // 返回所有符合给定模式pattern的key
 // 返回值类型: Array, 匹配到的key的数组
-func (c *Client) Keys(pattern string) ([]string, error) {
+func (c *Client) Keys(pattern string) (result []string, err error) {
 	cmd := args.Get()
 	cmd.AppendArgs("KEYS", pattern)
 	cmdBytes := cmd.Bytes()
@@ -695,7 +696,13 @@ func (c *Client) Keys(pattern string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return reply.parseKeysResult()
+
+	array := reply.Array()
+	result = make([]string, 0, len(array))
+	for _, v := range array {
+		result = append(result, v.ValueString())
+	}
+	return
 }
 
 // Move v1.0.0后可用
@@ -865,7 +872,22 @@ func (c *Client) Scan(cursor int, option *generic.ScanOption) (result *generic.S
 		return nil, err
 	}
 
-	return reply.parseScanResult()
+	// SCAN命令回复格式: 长度为2的数组
+	// 数组第一个元素为返回的cursor
+	// 第二个元素是由返回的key组成的数组
+	array := reply.Array()
+	if len(array) != 2 {
+		return
+	}
+	keysArray := array[1].Array()
+	result = &generic.ScanResult{
+		Keys: make([]string, 0, len(keysArray)),
+	}
+	result.Cursor, _ = array[0].Integer()
+	for _, k := range keysArray {
+		result.Keys = append(result.Keys, k.ValueString())
+	}
+	return
 }
 
 // Type v1.0.0后可用
