@@ -42,6 +42,10 @@ func New(opts ...Option) *Client {
 	return c
 }
 
+func (c *Client) Close() {
+	c.pool.Close()
+}
+
 func (c *Client) sendCommandWithoutTimeout(cmd []byte) (result *Reply, err error) {
 	conn, err := c.pool.Get(c.checkConn)
 	if err != nil {
