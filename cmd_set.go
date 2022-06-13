@@ -3,7 +3,6 @@ package rediss
 import (
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/set"
-	"github.com/pyihe/rediss/pool"
 )
 
 // SAdd v1.0.0后可用
@@ -51,7 +50,7 @@ func (c *Client) SCard(key string) (int64, error) {
 // 时间复杂度: O(N), N为所有set的元素总数
 // 获取第一个key对应的set和其他key对应的set之间不同成员构成的set
 // 返回值类型: Array, 返回差异集合的所有成员
-func (c *Client) SDiff(keys ...string) (*pool.Reply, error) {
+func (c *Client) SDiff(keys ...string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SDIFF")
 	cmd.Append(keys...)
@@ -85,7 +84,7 @@ func (c *Client) SDiffStore(dst string, keys ...string) (int64, error) {
 // 返回由所有给定set的交集产生的集合成员
 // 如果key不存在将会被视为空set, 交集也将会是空
 // 返回值类型: Array, 结果集合的成员
-func (c *Client) SInter(keys ...string) (*pool.Reply, error) {
+func (c *Client) SInter(keys ...string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SINTER")
 	cmd.Append(keys...)
@@ -164,7 +163,7 @@ func (c *Client) SIsMember(key string, member interface{}) (bool, error) {
 // 时间复杂度: O(N), N为集合基数(即集合成员数量)
 // 获取key对应的集合的所有成员
 // 返回值类型: Array, 返回成员组成的数组
-func (c *Client) SMembers(key string) (*pool.Reply, error) {
+func (c *Client) SMembers(key string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SMEMBERS", key)
 	cmdBytes := cmd.Bytes()
@@ -188,13 +187,7 @@ func (c *Client) SMIsMember(key string, members ...interface{}) (result []bool, 
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]bool, len(array))
-	for i, v := range array {
-		result[i] = v.ValueString() == "1"
-	}
-	return
+	return reply.parseIsMember()
 }
 
 // SMove v1.0.0后可用
@@ -228,7 +221,7 @@ func (c *Client) SMove(src, dst string, member interface{}) (bool, error) {
 // 返回值类型:
 // 1. 没有提供count选项时: Bulk String, 返回被移除的成员, 如果key不存在时返回nil
 // 2. 提供了count参数时: Array, 返回被移除的成员, 如果key不存在时返回一个空的数组
-func (c *Client) SPop(key string, count int64) (*pool.Reply, error) {
+func (c *Client) SPop(key string, count int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SPOP", key)
 	if count > 1 {
@@ -253,7 +246,7 @@ func (c *Client) SPop(key string, count int64) (*pool.Reply, error) {
 // 返回值类型:
 // 没有count参数: Bulk String, 返回随机的成员, 如果key不存在时返回nil
 // 有count参数: Array, 返回随机的成员列表, 如果key不存在返回空数组
-func (c *Client) SRandMember(key string, count int64) (*pool.Reply, error) {
+func (c *Client) SRandMember(key string, count int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SRANDMEMBER", key)
 	if count != 0 {
@@ -308,15 +301,7 @@ func (c *Client) SScan(key string, cursor int64, option *set.ScanOption) (result
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &set.ScanResult{}
-	result.Cursor, err = array[0].Integer()
-	result.Members = make([]string, 0, len(array[1].Array()))
-	for _, v := range array[1].Array() {
-		result.Members = append(result.Members, v.ValueString())
-	}
-	return
+	return reply.parseSScanResult()
 }
 
 // SUnion v1.0.0后可用
@@ -324,7 +309,7 @@ func (c *Client) SScan(key string, cursor int64, option *set.ScanOption) (result
 // 时间复杂度: O(N), N所有集合中成员总数
 // 获取指定集合的并集, 如果集合不存在将会被视为空集合
 // 返回值类型: Array, 返回并集中的成员
-func (c *Client) SUnion(keys ...string) (*pool.Reply, error) {
+func (c *Client) SUnion(keys ...string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("SUNION")
 	cmd.Append(keys...)

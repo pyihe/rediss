@@ -5,7 +5,6 @@ import (
 
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/redisstring"
-	"github.com/pyihe/rediss/pool"
 )
 
 // Append v2.0.0后可用
@@ -73,7 +72,7 @@ func (c *Client) DecrBy(key string, decrement int64) (int64, error) {
 // 获取key存储的值, 如果key不存在则返回nil
 // Get只用于操作字符串类型的key, 如果key存储的不是字符串类型, 则返回错误
 // 返回值类型: Bulk String或者nil(key不存在时)
-func (c *Client) Get(key string) (*pool.Reply, error) {
+func (c *Client) Get(key string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("GET", key)
 	cmdBytes := cmd.Bytes()
@@ -86,7 +85,7 @@ func (c *Client) Get(key string) (*pool.Reply, error) {
 // 时间复杂度: O(1)
 // 获取key的值后将key删除, 只能操作于字符串类型的key
 // 返回值类型: Bulk String或者nil(key不存在时)
-func (c *Client) GetDel(key string) (*pool.Reply, error) {
+func (c *Client) GetDel(key string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("GETDEL", key)
 	cmdBytes := cmd.Bytes()
@@ -105,7 +104,7 @@ func (c *Client) GetDel(key string) (*pool.Reply, error) {
 // PXAT: 指定过期时间点(以毫秒为单位的时间戳)
 // PERSIST: 移除key的有效期, 使其长期有效
 // 返回值类型: Bulk String或者nil(key不存在时)
-func (c *Client) GetEx(key string, expireOption string, expire int64) (*pool.Reply, error) {
+func (c *Client) GetEx(key string, expireOption string, expire int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("GETEX", key)
 	if expireOption != "" {
@@ -125,7 +124,7 @@ func (c *Client) GetEx(key string, expireOption string, expire int64) (*pool.Rep
 // 时间复杂度: O(N), N为返回的字符串长度; 因为从既有的字符串创建子串代价很小, 所以对于小字符串来说可以看作是O(1)
 // 获取key的值的子串, start和end可以为负, 表示从字符串末尾开始, -1表示最后一个字符, -2表示倒数第二个字符
 // 返回值类型: Bulk String
-func (c *Client) GetRange(key string, start, end int64) (*pool.Reply, error) {
+func (c *Client) GetRange(key string, start, end int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("GETRANGE", key, start, end)
 	cmdBytes := cmd.Bytes()
@@ -139,7 +138,7 @@ func (c *Client) GetRange(key string, start, end int64) (*pool.Reply, error) {
 // 获取key存储的旧值, 并存储新值value
 // 返回值类型: Bulk String, 返回key存储的旧值或者nil(key不存在时)
 // v6.2.0后可用带有GET参数的SET命令替代GETSET
-func (c *Client) GetSet(key string, value interface{}) (*pool.Reply, error) {
+func (c *Client) GetSet(key string, value interface{}) (*Reply, error) {
 	cmd := args.Get()
 	cmd.AppendArgs("GETSET", key, value)
 	cmdBytes := cmd.Bytes()
@@ -272,43 +271,7 @@ func (c *Client) LCSIdx(key1, key2 string, minMatchLen int64, withMatchLen bool)
 	if err != nil {
 		return nil, err
 	}
-
-	result = &redisstring.LCSResult{}
-	array := reply.Array()
-
-	// 获取LCS结果的长度
-	result.Len, err = array[3].Integer()
-	if err != nil {
-		return
-	}
-
-	// 获取每个匹配结果的位置
-	matchArray := array[1].Array()
-	result.Matches = make([]redisstring.LCSMatch, 0, len(matchArray))
-	for _, mat := range matchArray {
-		m := redisstring.LCSMatch{
-			Indexes: make([]redisstring.Index, 0, 3),
-		}
-		indexArray := mat.Array()
-		for i := 0; i < 2; i++ {
-			posArray := indexArray[i].Array()
-			idx := redisstring.Index{}
-			if idx.Start, err = posArray[0].Integer(); err != nil {
-				return
-			}
-			if idx.Stop, err = posArray[1].Integer(); err != nil {
-				return
-			}
-			m.Indexes = append(m.Indexes, idx)
-		}
-		if len(indexArray) == 3 {
-			if m.Len, err = indexArray[2].Integer(); err != nil {
-				return
-			}
-		}
-		result.Matches = append(result.Matches, m)
-	}
-	return
+	return reply.parseLCSResult()
 }
 
 // MGet v1.0.0后可用
@@ -316,7 +279,7 @@ func (c *Client) LCSIdx(key1, key2 string, minMatchLen int64, withMatchLen bool)
 // 时间复杂度: O(N)
 // 返回指定keys的值, 对于每个不存在或者值类型不为字符串的key, 该key的结果将会返回nil
 // 返回值类型: Array
-func (c *Client) MGet(keys ...string) ([]*pool.Reply, error) {
+func (c *Client) MGet(keys ...string) ([]*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("MGET")
 	cmd.Append(keys...)
@@ -328,7 +291,7 @@ func (c *Client) MGet(keys ...string) ([]*pool.Reply, error) {
 		return nil, err
 	}
 
-	return reply.Array(), err
+	return reply.Array, err
 }
 
 // MSet v1.0.1后可用

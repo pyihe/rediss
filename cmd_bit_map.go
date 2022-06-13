@@ -8,7 +8,6 @@ import (
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/bitmap"
-	"github.com/pyihe/rediss/pool"
 )
 
 // BitCount v2.6.0后可用
@@ -45,7 +44,7 @@ func (c *Client) BitCount(key string, option *bitmap.BitOption) (int64, error) {
 // 时间复杂度: 每个子命令的时间复杂度为: O(1)
 // BITFIELD只读属性的命令, 类似于GEORADIUS_RO
 // 返回值类型: Integer, 返回GET指定位的值
-func (c *Client) BitFieldGet(key string, opts ...*bitmap.FieldOption) (*pool.Reply, error) {
+func (c *Client) BitFieldGet(key string, opts ...*bitmap.FieldOption) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -85,7 +84,7 @@ func (c *Client) BitFieldGet(key string, opts ...*bitmap.FieldOption) (*pool.Rep
 // 命令格式: BITFIELD key GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment [ GET encoding offset | [OVERFLOW WRAP | SAT | FAIL] SET encoding offset value | INCRBY encoding offset increment ...]
 // 时间复杂度: O(1)对于每个指定的子命令
 // 返回值类型: 该命令返回一个数组，其中每个条目是在同一位置给出的子命令的相应结果。 OVERFLOW 子命令不计为生成回复
-func (c *Client) BitField(key string, opts ...*bitmap.FieldOption) (*pool.Reply, error) {
+func (c *Client) BitField(key string, opts ...*bitmap.FieldOption) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -138,7 +137,7 @@ func (c *Client) BitField(key string, opts ...*bitmap.FieldOption) (*pool.Reply,
 // 时间复杂度: 每个子命令O(1)
 // BitField命令的只读版本
 // 返回值类型: Array, 没回每个子命令回复组成的数组, 子命令和回复的位置一一对应
-func (c *Client) BitFieldRo(key string, opts ...*bitmap.FieldRoOption) (*pool.Reply, error) {
+func (c *Client) BitFieldRo(key string, opts ...*bitmap.FieldRoOption) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -183,23 +182,12 @@ func (c *Client) BitFieldRo(key string, opts ...*bitmap.FieldRoOption) (*pool.Re
 // 返回值类型: Integer, 存储在目标键中的字符串的大小，即等于最长输入字符串的大小
 func (c *Client) BitOp(op, dst string, keys ...string) (int64, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
-	cmd.Append("BITOP")
-	switch strings.ToUpper(op) {
-	case "NOT":
-		if len(keys) > 1 {
-			return 0, errors.New("NOT operation only support one input key")
-		}
-		fallthrough
-	case "AND", "OR", "XOR":
-		cmd.Append(op, dst)
-	default:
-		return 0, ErrInvalidArgumentFormat
-	}
+	cmd.Append("BITOP", op, dst)
 	cmd.Append(keys...)
+	cmdBts := cmd.Bytes()
+	args.Put(cmd)
 
-	reply, err := c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmdBts)
 	if err != nil {
 		return 0, err
 	}

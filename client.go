@@ -42,41 +42,40 @@ func New(opts ...Option) *Client {
 	return c
 }
 
-func (c *Client) sendCommandWithoutTimeout(cmd []byte) (result *pool.Reply, err error) {
+func (c *Client) sendCommandWithoutTimeout(cmd []byte) (result *Reply, err error) {
 	conn, err := c.pool.Get(c.checkConn)
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = conn.WriteBytes(cmd, 0)
-	if err != nil {
-		return nil, err
+	if err = writeConn(conn, cmd, 0); err != nil {
+		return
 	}
-
-	result, err = conn.ReadReply(0)
+	result, err = readConn(conn, 0)
+	c.pool.Put(conn)
 	return
 }
 
-func (c *Client) sendCommand(cmd []byte) (result *pool.Reply, err error) {
+func (c *Client) sendCommand(cmd []byte) (result *Reply, err error) {
 	conn, err := c.pool.Get(c.checkConn)
 	if err != nil {
 		return nil, err
 	}
-	_, err = conn.WriteBytes(cmd, c.writeTimeout)
-	if err != nil {
-		return nil, err
+	if err = writeConn(conn, cmd, c.writeTimeout); err != nil {
+		return
 	}
-
-	result, err = conn.ReadReply(c.readTimeout)
+	result, err = readConn(conn, c.readTimeout)
+	c.pool.Put(conn)
 	return
 }
 
 func (c *Client) checkConn(conn *pool.RedisConn) error {
-	_, err := conn.WriteBytes(args.Command("PING"), 0)
+	err := writeConn(conn, args.Command("PING"), 0)
 	if err != nil {
 		return err
 	}
-	_, _ = conn.ReadReply(0)
+	if _, err = readConn(conn, 0); err != nil {
+		return err
+	}
 	if len(c.password) > 0 {
 		var cmd []byte
 		if len(c.username) > 0 {
@@ -84,12 +83,16 @@ func (c *Client) checkConn(conn *pool.RedisConn) error {
 		} else {
 			cmd = args.Command("AUTH", c.password)
 		}
-		if _, err = conn.WriteBytes(cmd, 0); err != nil {
+		if err = writeConn(conn, cmd, 0); err != nil {
 			return err
 		}
-		_, _ = conn.ReadReply(0)
+		if _, err = readConn(conn, 0); err != nil {
+			return err
+		}
 	}
-	_, err = conn.WriteBytes(args.Command("SELECT", c.database), 0)
-	_, _ = conn.ReadReply(0)
+	if err = writeConn(conn, args.Command("SELECT", c.database), 0); err != nil {
+		return err
+	}
+	_, err = readConn(conn, 0)
 	return err
 }

@@ -2,13 +2,11 @@ package rediss
 
 import (
 	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/generic"
-	"github.com/pyihe/rediss/pool"
 )
 
 // Ping v1.0.0后可用
@@ -217,7 +215,7 @@ func (c *Client) ObjectFreq(key string) (int64, error) {
 // 时间复杂度: O(1)
 // OBJECT HELP 命令返回描述不同子命令的有用文本
 // 返回值类型: Array, 返回子命令和它们的描述的数组
-func (c *Client) ObjectHelp() (*pool.Reply, error) {
+func (c *Client) ObjectHelp() (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("OBJECT", "HELP")
 	cmdBytes := cmd.Bytes()
@@ -310,7 +308,7 @@ func (c *Client) Restore(key string, value string, option *generic.RestoreOption
 // 返回值类型:
 // 1. 没有传递store参数, 返回排序后元素的列表
 // 2. 如果指明了store参数, 返回存储在dst列表中的元素数量
-func (c *Client) Sort(key string, option *generic.SortOption) (*pool.Reply, error) {
+func (c *Client) Sort(key string, option *generic.SortOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -341,7 +339,7 @@ func (c *Client) Sort(key string, option *generic.SortOption) (*pool.Reply, erro
 
 // SortRo v7.0.0后可用
 // Sort的只读版本
-func (c *Client) SortRo(key string, option *generic.SortOption) (*pool.Reply, error) {
+func (c *Client) SortRo(key string, option *generic.SortOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -472,8 +470,7 @@ func (c *Client) Dump(key string) (string, error) {
 	cmdBytes := cmd.Bytes()
 	args.Put(cmd)
 	reply, err := c.sendCommand(cmdBytes)
-	if reply == nil && err == nil {
-		err = NilReply
+	if err != nil {
 		return "", err
 	}
 	return reply.ValueString(), err
@@ -520,20 +517,14 @@ func (c *Client) Exists(keys ...string) (int64, error) {
 // op: [NX|XX|GT|LT]
 func (c *Client) Expire(key string, sec int64, op string) (bool, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("EXPIRE", key)
 	cmd.AppendArgs(sec)
-	switch strings.ToUpper(op) {
-	case "NX", "XX", "GT", "LT":
+	if op != "" {
 		cmd.Append(op)
-	case "":
-		break
-	default:
-		return false, ErrInvalidArgumentFormat
 	}
-
-	reply, err := c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	reply, err := c.sendCommand(cmdBytes)
 	if err != nil {
 		return false, err
 	}
@@ -555,19 +546,15 @@ func (c *Client) Expire(key string, sec int64, op string) (bool, error) {
 // op: [NX|XX|GT|LT]
 func (c *Client) ExpireAt(key string, unix int64, op string) (bool, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
 	cmd.Append("PEXPIREAT", key)
 	cmd.AppendArgs(unix)
-	switch strings.ToUpper(op) {
-	case "NX", "XX", "GT", "LT":
+	if op != "" {
 		cmd.Append(op)
-	case "":
-		break
-	default:
-		return false, ErrInvalidArgumentFormat
 	}
+	cmdBts := cmd.Bytes()
+	args.Put(cmd)
 
-	reply, err := c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmdBts)
 	if err != nil {
 		return false, err
 	}
@@ -608,20 +595,14 @@ func (c *Client) ExpireTime(key string) (int64, error) {
 // op: [NX|XX|GT|LT]
 func (c *Client) PExpire(key string, millSec int64, op string) (bool, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.AppendArgs("PEXPIRE", key)
 	cmd.AppendArgs(millSec)
-	switch strings.ToUpper(op) {
-	case "NX", "XX", "GT", "LT":
+	if op != "" {
 		cmd.Append(op)
-	case "":
-		break
-	default:
-		return false, ErrInvalidArgumentFormat
 	}
-
-	reply, err := c.sendCommand(cmd.Bytes())
+	cmdBts := cmd.Bytes()
+	args.Put(cmd)
+	reply, err := c.sendCommand(cmdBts)
 	if err != nil {
 		return false, err
 	}
@@ -642,19 +623,14 @@ func (c *Client) PExpire(key string, millSec int64, op string) (bool, error) {
 // op: [NX|XX|GT|LT]
 func (c *Client) PExpireAt(key string, millUnix int64, op string) (bool, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.AppendArgs("PEXPIREAT", key)
 	cmd.AppendArgs(millUnix)
-	switch strings.ToUpper(op) {
-	case "NX", "XX", "GT", "LT":
+	if op != "" {
 		cmd.Append(op)
-	case "":
-		break
-	default:
-		return false, ErrInvalidArgumentFormat
 	}
-	reply, err := c.sendCommand(cmd.Bytes())
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+	reply, err := c.sendCommand(cmdBytes)
 	if err != nil {
 		return false, err
 	}
@@ -696,13 +672,7 @@ func (c *Client) Keys(pattern string) (result []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]string, 0, len(array))
-	for _, v := range array {
-		result = append(result, v.ValueString())
-	}
-	return
+	return reply.parseKeysResult()
 }
 
 // Move v1.0.0后可用
@@ -872,22 +842,7 @@ func (c *Client) Scan(cursor int, option *generic.ScanOption) (result *generic.S
 		return nil, err
 	}
 
-	// SCAN命令回复格式: 长度为2的数组
-	// 数组第一个元素为返回的cursor
-	// 第二个元素是由返回的key组成的数组
-	array := reply.Array()
-	if len(array) != 2 {
-		return
-	}
-	keysArray := array[1].Array()
-	result = &generic.ScanResult{
-		Keys: make([]string, 0, len(keysArray)),
-	}
-	result.Cursor, _ = array[0].Integer()
-	for _, k := range keysArray {
-		result.Keys = append(result.Keys, k.ValueString())
-	}
-	return
+	return reply.parseScanResult()
 }
 
 // Type v1.0.0后可用

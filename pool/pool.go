@@ -13,14 +13,12 @@ import (
 var (
 	ErrUninitializedPool = errors.New("uninitialized pool")
 	ErrAlreadyClosedPool = errors.New("pool closed")
-	NilReply             = errors.New("nil reply")
 )
 
 var (
-	defaultObtainTimeout = 2 * time.Second
-	defaultIdleDuration  = 1 * time.Second
-	defaultMaxConnSize   = 16
-	defaultMinConnSize   = 4
+	defaultIdleDuration = 10 * time.Second
+	defaultMaxConnSize  = 16
+	defaultMinConnSize  = 4
 )
 
 type Config struct {

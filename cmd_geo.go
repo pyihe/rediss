@@ -1,12 +1,9 @@
 package rediss
 
 import (
-	"strings"
-
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/geo"
-	"github.com/pyihe/rediss/pool"
 )
 
 // GeoAdd v3.2.0后可用
@@ -32,23 +29,17 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (int64, error)
 	}
 
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("GEOADD", key)
-	switch strings.ToUpper(op) {
-	case "XX", "NX", "CH":
+	if op != "" {
 		cmd.Append(op)
-	case "":
-		break
-	default:
-		return 0, ErrInvalidArgumentFormat
 	}
-
 	for _, me := range members {
 		cmd.AppendArgs(me.Longitude, me.Latitude, me.Name)
 	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
 
-	reply, err := c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmdBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -68,19 +59,14 @@ func (c *Client) GeoAdd(key, op string, members ...*geo.Location) (int64, error)
 // 返回值类型: Bulk String, 返回nil或者双精度浮点数的距离
 func (c *Client) GeoDist(key string, member1, member2 string, unit string) (float64, error) {
 	cmd := args.Get()
-	defer args.Put(cmd)
-
 	cmd.Append("GEODIST", key, member1, member2)
-	switch strings.ToUpper(unit) {
-	case "M", "KM", "FT", "MI":
+	if unit != "" {
 		cmd.Append(unit)
-	case "":
-		break
-	default:
-		return 0, ErrInvalidArgumentFormat
 	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
 
-	reply, err := c.sendCommand(cmd.Bytes())
+	reply, err := c.sendCommand(cmdBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -102,12 +88,7 @@ func (c *Client) GeoHash(key string, members ...string) (result []string, err er
 		return nil, err
 	}
 
-	array := reply.Array()
-	result = make([]string, 0, len(array))
-	for _, v := range array {
-		result = append(result, v.ValueString())
-	}
-	return
+	return reply.parseGeoHashResult()
 }
 
 // GeoPos v3.2.0后可用
@@ -128,23 +109,7 @@ func (c *Client) GeoPos(key string, members ...string) (result []*geo.Location, 
 	if err != nil {
 		return nil, err
 	}
-
-	result = make([]*geo.Location, len(members))
-	for i, arr := range reply.Array() {
-		if arr != nil {
-			var subArr = arr.Array()
-			var location = &geo.Location{Name: members[i]}
-
-			if location.Longitude, err = subArr[0].Float(); err != nil {
-				return
-			}
-			if location.Latitude, err = subArr[1].Float(); err != nil {
-				return
-			}
-			result[i] = location
-		}
-	}
-	return
+	return reply.parseGeoPosResult(members...)
 }
 
 // GeoRadiusRo v3.2.10后可用, v6.2.0后被视为废弃
@@ -195,11 +160,8 @@ func (c *Client) GeoRadiusRo(key string, longitude, latitude float64, option *ge
 	if err != nil {
 		return nil, err
 	}
-	if err = reply.Error(); err != nil {
-		return nil, err
-	}
 
-	return reply.ParseGeoLocation(option)
+	return reply.parseGeoLocation(option)
 }
 
 // GeoRadius v3.2.0后可用, v6.2.0开始被视为废弃
@@ -275,14 +237,10 @@ func (c *Client) GeoRadius(key string, longitude, latitude float64, option *geo.
 	if err != nil {
 		return nil, err
 	}
-	if err = reply.Error(); err != nil {
-		return nil, err
-	}
-
-	return reply.ParseGeoLocation(option)
+	return reply.parseGeoLocation(option)
 }
 
-func (c *Client) GeoRadiusStore(key string, longitude, latitude float64, option *geo.RadiusOption) (*pool.Reply, error) {
+func (c *Client) GeoRadiusStore(key string, longitude, latitude float64, option *geo.RadiusOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -369,13 +327,10 @@ func (c *Client) GeoRadiusByMember(key, member string, option *geo.RadiusOption)
 	if err != nil {
 		return nil, err
 	}
-	if err = reply.Error(); err != nil {
-		return nil, err
-	}
-	return reply.ParseGeoLocation(option)
+	return reply.parseGeoLocation(option)
 }
 
-func (c *Client) GeoRadiusByMemberStore(key, member string, option *geo.RadiusOption) (*pool.Reply, error) {
+func (c *Client) GeoRadiusByMemberStore(key, member string, option *geo.RadiusOption) (*Reply, error) {
 	if option == nil {
 		return nil, ErrEmptyOptionArgument
 	}
@@ -454,10 +409,7 @@ func (c *Client) GeoRadiusByMemberRo(key, member string, option *geo.RadiusOptio
 	if err != nil {
 		return nil, err
 	}
-	if err = reply.Error(); err != nil {
-		return nil, err
-	}
-	return reply.ParseGeoLocation(option)
+	return reply.parseGeoLocation(option)
 }
 
 // GeoSearch v6.2.0后可用
@@ -533,11 +485,7 @@ func (c *Client) GeoSearch(key string, option *geo.SearchOption) (result []*geo.
 	if err != nil {
 		return nil, err
 	}
-	if err = reply.Error(); err != nil {
-		return nil, err
-	}
-
-	return reply.ParseGeoLocation(option)
+	return reply.parseGeoLocation(option)
 }
 
 // GeoSearchStore v6.2.0后可用

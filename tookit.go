@@ -1,6 +1,10 @@
 package rediss
 
 import (
+	"strconv"
+
+	innerBytes "github.com/pyihe/go-pkg/bytes"
+	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/rediss/args"
 )
 
@@ -29,4 +33,19 @@ func appendArgs(args *args.Args, arg interface{}) (err error) {
 		err = ErrNotSupportArgument
 	}
 	return
+}
+
+func isNilReply(reply []byte) bool {
+	if len(reply) == 3 && (reply[0] == '$' || reply[0] == '*') && reply[1] == '-' && reply[2] == '1' {
+		return true
+	}
+	return false
+}
+
+func dataLen(b []byte) (int, error) {
+	if len(b) == 0 {
+		return -1, errors.New("invalid length")
+	}
+
+	return strconv.Atoi(innerBytes.String(b))
 }

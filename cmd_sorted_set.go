@@ -3,7 +3,6 @@ package rediss
 import (
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/sortedset"
-	"github.com/pyihe/rediss/pool"
 )
 
 // BZMPop v7.0.0后可用
@@ -32,23 +31,7 @@ func (c *Client) BZMPop(timeout float64, keys []string, op string, count int64) 
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &sortedset.PopResult{}
-	result.Key = array[0].ValueString()
-	memberArray := array[1].Array()
-	result.Members = make([]sortedset.Member, 0, len(memberArray))
-	for _, mem := range memberArray {
-		pm := mem.Array()
-		m := sortedset.Member{}
-		m.Value = pm[0].ValueString()
-		m.Score, err = pm[1].Float()
-		if err != nil {
-			return nil, err
-		}
-		result.Members = append(result.Members, m)
-	}
-	return
+	return reply.parseZPop()
 }
 
 // BZPopMax v5.0.0后可用
@@ -70,17 +53,7 @@ func (c *Client) BZPopMax(keys []string, timeout float64) (result *sortedset.Pop
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &sortedset.PopResult{
-		Members: make([]sortedset.Member, 1),
-	}
-	result.Key = array[0].ValueString()
-	member := sortedset.Member{}
-	member.Value = array[1].ValueString()
-	member.Score, err = array[2].Float()
-	result.Members[0] = member
-	return
+	return reply.parseZPopXX()
 }
 
 // BZPopMin v5.0.0后可用
@@ -103,17 +76,7 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (result *sortedset.Pop
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &sortedset.PopResult{
-		Members: make([]sortedset.Member, 1),
-	}
-	result.Key = array[0].ValueString()
-	member := sortedset.Member{}
-	member.Value = array[1].ValueString()
-	member.Score, err = array[2].Float()
-	result.Members[0] = member
-	return
+	return reply.parseZPopXX()
 }
 
 // ZAdd v1.2.0后可用
@@ -128,7 +91,7 @@ func (c *Client) BZPopMin(keys []string, timeout float64) (result *sortedset.Pop
 // 当没有提供可选参数时, 返回新增元素的个数, 通过Reply.Integer获取结果
 // 如果指定了CH参数, 返回新增以及更新的元素个数, 通过Reply.Integer获取结果
 // 如果提供了INCR参数, 返回值将会变为Bulk String, 返回成员的新分数(双精度浮点数)表示为字符串，如果操作被中止（当使用 XX 或 NX 选项调用时），则为 nil, 通过Reply.ValueString获取结果
-func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*pool.Reply, error) {
+func (c *Client) ZAdd(key string, option *sortedset.AddOption, members ...*sortedset.Member) (*Reply, error) {
 	cmd := args.Get()
 	defer args.Put(cmd)
 
@@ -210,28 +173,7 @@ func (c *Client) ZDiff(withScore bool, keys ...string) (result []sortedset.Membe
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZDiffStore v6.2.0后可用
@@ -306,28 +248,7 @@ func (c *Client) ZInter(keys []string, weights []float64, Aggregate string, with
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZInterCard v7.0.0开始可用
@@ -430,23 +351,7 @@ func (c *Client) ZMPop(keys []string, op string, count int64) (result *sortedset
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &sortedset.PopResult{}
-	result.Key = array[0].ValueString()
-	memberArray := array[1].Array()
-	result.Members = make([]sortedset.Member, 0, len(memberArray))
-	for _, mem := range memberArray {
-		pm := mem.Array()
-		m := sortedset.Member{}
-		m.Value = pm[0].ValueString()
-		m.Score, err = pm[1].Float()
-		if err != nil {
-			return nil, err
-		}
-		result.Members = append(result.Members, m)
-	}
-	return
+	return reply.parseZPop()
 }
 
 // ZMScore v6.2.0后可用
@@ -466,19 +371,7 @@ func (c *Client) ZMScore(key string, members ...interface{}) (result []float64, 
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]float64, len(array))
-	for i := 0; i < len(array); i++ {
-		if array[i] == nil {
-			continue
-		}
-		result[i], err = array[i].Float()
-		if err != nil {
-			break
-		}
-	}
-	return
+	return reply.parseZMScore()
 }
 
 // ZPopMax v5.0.0后可用
@@ -500,19 +393,7 @@ func (c *Client) ZPopMax(key string, count int64) (result []sortedset.Member, er
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]sortedset.Member, 0, len(array)/2)
-	for i := 0; i < len(array)-1; i += 2 {
-		m := sortedset.Member{}
-		m.Value = array[i].ValueString()
-		m.Score, err = array[i+1].Float()
-		if err != nil {
-			return
-		}
-		result = append(result, m)
-	}
-	return
+	return reply.parseToMember(true)
 }
 
 // ZPopMin v5.0.0后可用
@@ -533,19 +414,7 @@ func (c *Client) ZPopMin(key string, count int64) (result []sortedset.Member, er
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]sortedset.Member, 0, len(array)/2)
-	for i := 0; i < len(array)-1; i += 2 {
-		m := sortedset.Member{}
-		m.Value = array[i].ValueString()
-		m.Score, err = array[i+1].Float()
-		if err != nil {
-			return
-		}
-		result = append(result, m)
-	}
-	return
+	return reply.parseToMember(true)
 }
 
 // ZRandMember v6.2.0后可用
@@ -578,26 +447,7 @@ func (c *Client) ZRandMember(key string, count int64, withScore bool) ([]sorteds
 		m := sortedset.Member{Value: reply.ValueString()}
 		return []sortedset.Member{m}, nil
 	}
-
-	var result []sortedset.Member
-	var array = reply.Array()
-	if !withScore {
-		result = make([]sortedset.Member, 0, len(array))
-		for i := 0; i < len(array); i++ {
-			m := sortedset.Member{Value: array[i].ValueString()}
-			result = append(result, m)
-		}
-		return result, nil
-	}
-
-	result = make([]sortedset.Member, 0, len(array)/2)
-	for i := 0; i < len(array)-1; i += 2 {
-		m := sortedset.Member{}
-		m.Value = array[i].ValueString()
-		m.Score, err = array[i+1].Float()
-		result = append(result, m)
-	}
-	return result, nil
+	return reply.parseToMember(withScore)
 }
 
 // ZRange v1.2.0后可用
@@ -656,28 +506,7 @@ func (c *Client) ZRange(key string, option *sortedset.RangeOption) (result []sor
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZRangeByLex v2.8.9后可用, v6.2.0后废弃
@@ -703,14 +532,7 @@ func (c *Client) ZRangeByLex(key string, option *sortedset.RangeOption) (result 
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]sortedset.Member, 0, len(array))
-	for _, ele := range array {
-		m := sortedset.Member{Value: ele.ValueString()}
-		result = append(result, m)
-	}
-	return
+	return reply.parseToMember(false)
 }
 
 // ZRangeByScore v1.0.5后可用, v6.2.0开始废弃
@@ -740,28 +562,7 @@ func (c *Client) ZRangeByScore(key string, option *sortedset.RangeOption) (resul
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZRangeStore v6.2.0后可用
@@ -932,28 +733,7 @@ func (c *Client) ZRevRange(key string, option *sortedset.RangeOption) (result []
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZRevRangeByLex v2.8.9后可用, 从v6.2.0开始被视为废弃
@@ -976,14 +756,7 @@ func (c *Client) ZRevRangeByLex(key string, option *sortedset.RangeOption) (resu
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = make([]sortedset.Member, 0, len(array))
-	for _, ele := range array {
-		m := sortedset.Member{Value: ele.ValueString()}
-		result = append(result, m)
-	}
-	return
+	return reply.parseToMember(false)
 }
 
 // ZRevRangeByScore v2.2.0后可用, v6.2.0开始被视为废弃
@@ -1012,28 +785,7 @@ func (c *Client) ZRevRangeByScore(key string, option *sortedset.RangeOption) (re
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZScan v2.8.0后可用
@@ -1058,25 +810,7 @@ func (c *Client) ZScan(key string, cursor int64, pattern string, count int64) (r
 	if err != nil {
 		return nil, err
 	}
-
-	result = &sortedset.ScanResult{}
-	array := reply.Array()
-	result.Cursor, err = array[0].Integer()
-	if err != nil {
-		return
-	}
-	memArray := array[1].Array()
-	result.Members = make([]sortedset.Member, 0, len(memArray)/2)
-	for i := 0; i < len(memArray)-1; i += 2 {
-		m := sortedset.Member{}
-		m.Value = memArray[i].ValueString()
-		m.Score, err = memArray[i+1].Float()
-		if err != nil {
-			return
-		}
-		result.Members = append(result.Members, m)
-	}
-	return
+	return reply.parseZScanResult()
 }
 
 // ZScore v1.2.0后可用
@@ -1131,27 +865,7 @@ func (c *Client) ZUnion(keys []string, weights []float64, aggregate string, with
 	if err != nil {
 		return nil, err
 	}
-	array := reply.Array()
-	switch withScore {
-	case true:
-		result = make([]sortedset.Member, 0, len(array)/2)
-		for i := 0; i < len(array)-1; i += 2 {
-			m := sortedset.Member{}
-			m.Value = array[i].ValueString()
-			m.Score, err = array[i+1].Float()
-			if err != nil {
-				return
-			}
-			result = append(result, m)
-		}
-	default:
-		result = make([]sortedset.Member, 0, len(array))
-		for _, ele := range array {
-			m := sortedset.Member{Value: ele.ValueString()}
-			result = append(result, m)
-		}
-	}
-	return
+	return reply.parseToMember(withScore)
 }
 
 // ZUnionStore v2.0.0后可用

@@ -4,7 +4,6 @@ import (
 	"github.com/pyihe/go-pkg/maths"
 	"github.com/pyihe/rediss/args"
 	"github.com/pyihe/rediss/model/list"
-	"github.com/pyihe/rediss/pool"
 )
 
 // BLMove v6.2.0后可用
@@ -20,7 +19,7 @@ import (
 // fromSide: pop类型: LEFT|RIGHT
 // toSide: push类型: LEFT|RIGHT
 // timeout: pop超时时间, 单位秒
-func (c *Client) BLMove(src, fromSide, dst, toSide string, timeout float64) (*pool.Reply, error) {
+func (c *Client) BLMove(src, fromSide, dst, toSide string, timeout float64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("BLMOVE", src, dst, fromSide, toSide)
 	cmd.AppendArgs(timeout)
@@ -58,17 +57,7 @@ func (c *Client) BLMPop(timeout float64, keys []string, from string, count int64
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &list.MPopResult{
-		Key: array[0].ValueString(),
-	}
-	elementsArray := array[1].Array()
-	result.Elements = make([]string, 0, len(elementsArray))
-	for _, v := range elementsArray {
-		result.Elements = append(result.Elements, v.ValueString())
-	}
-	return
+	return reply.parseMPopResult()
 }
 
 // BLPop v2.0.0后可用
@@ -92,13 +81,7 @@ func (c *Client) BLPop(keys []string, timeout float64) (result *list.BPopResult,
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &list.BPopResult{
-		Key:     array[0].ValueString(),
-		Element: array[1].ValueString(),
-	}
-	return
+	return reply.parseBPopResult()
 }
 
 // BRPop v2.0.0后可用
@@ -122,13 +105,7 @@ func (c *Client) BRPop(keys []string, timeout float64) (result *list.BPopResult,
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	result = &list.BPopResult{
-		Key:     array[0].ValueString(),
-		Element: array[1].ValueString(),
-	}
-	return
+	return reply.parseBPopResult()
 }
 
 // BRPopLPush v2.2.0后可用, v6.2.0后废弃
@@ -141,7 +118,7 @@ func (c *Client) BRPop(keys []string, timeout float64) (result *list.BPopResult,
 // src: 源队列
 // dst: 目的队列
 // timeout: 超时时间
-func (c *Client) BRPopLPush(src, dst string, timeout float64) (*pool.Reply, error) {
+func (c *Client) BRPopLPush(src, dst string, timeout float64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("BRPOPLPUSH", src, dst)
 	cmd.AppendArgs(timeout)
@@ -159,7 +136,7 @@ func (c *Client) BRPopLPush(src, dst string, timeout float64) (*pool.Reply, erro
 // 函数参数说明:
 // key: 命令执行于哪个队列
 // index: 指定索引
-func (c *Client) LIndex(key string, index int64) (*pool.Reply, error) {
+func (c *Client) LIndex(key string, index int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("LINDEX", key)
 	cmd.AppendArgs(index)
@@ -222,7 +199,7 @@ func (c *Client) LLen(key string) (int64, error) {
 // dst: 目的队列
 // from: LEFT|RIGHT
 // to: LEFT|RIGHT
-func (c *Client) LMove(src, dst, from, to string) (*pool.Reply, error) {
+func (c *Client) LMove(src, dst, from, to string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("LMOVE", src, dst, from, to)
 	cmdBytes := cmd.Bytes()
@@ -260,16 +237,7 @@ func (c *Client) LMPop(keys []string, from string, count int64) (result *list.MP
 		return nil, err
 	}
 
-	array := reply.Array()
-	result = &list.MPopResult{
-		Key: array[0].ValueString(),
-	}
-	elementsArray := array[1].Array()
-	result.Elements = make([]string, 0, len(elementsArray))
-	for _, v := range elementsArray {
-		result.Elements = append(result.Elements, v.ValueString())
-	}
-	return
+	return reply.parseMPopResult()
 }
 
 // LPop v1.0.0后可用
@@ -294,19 +262,7 @@ func (c *Client) LPop(key string, count int64) (result []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch len(array) {
-	case 0:
-		result = make([]string, 1)
-		result[0] = reply.ValueString()
-	default:
-		result = make([]string, 0, len(array))
-		for _, v := range array {
-			result = append(result, v.ValueString())
-		}
-	}
-	return
+	return reply.parsePopResult()
 }
 
 // LPos v6.0.6后可用
@@ -347,27 +303,7 @@ func (c *Client) LPos(key string, element interface{}, option *list.PosOption) (
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch len(array) {
-	case 0:
-		result = make([]int64, 0, 1)
-		pos, err := reply.Integer()
-		if err != nil {
-			return result, err
-		}
-		result = append(result, pos)
-	default:
-		result = make([]int64, 0, len(array))
-		for _, v := range array {
-			pos, err := v.Integer()
-			if err != nil {
-				return result, err
-			}
-			result = append(result, pos)
-		}
-	}
-	return
+	return reply.parseLPosResult()
 }
 
 // LPush v1.0.0后可用
@@ -418,7 +354,7 @@ func (c *Client) LPushX(key string, elements ...interface{}) (int64, error) {
 // 遍历结果包含stop所处位置的元素, 即元素位置为[start, stop]的闭区间
 // 超出范围的索引不会产生错误, 如果start大于列表的结尾, 则返回一个空列表; 如果stop大于列表的实际末尾, Redis会将其视为列表的最后一个元素
 // 返回值类型: Array, 返回range的结果
-func (c *Client) LRange(key string, start, stop int64) (*pool.Reply, error) {
+func (c *Client) LRange(key string, start, stop int64) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("LRANGE", key)
 	cmd.AppendArgs(start, stop)
@@ -509,19 +445,7 @@ func (c *Client) RPop(key string, count int64) (result []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	array := reply.Array()
-	switch len(array) {
-	case 0:
-		result = make([]string, 1)
-		result[0] = reply.ValueString()
-	default:
-		result = make([]string, 0, len(array))
-		for _, v := range array {
-			result = append(result, v.ValueString())
-		}
-	}
-	return
+	return reply.parsePopResult()
 }
 
 // RPopLPush v1.2.0后可用, v6.2.0后废弃
@@ -530,7 +454,7 @@ func (c *Client) RPop(key string, count int64) (result []string, err error) {
 // 自动返回并移除src中的尾部最后一个元素, 然后push进dst的头部
 // 如果src不存在, 将会返回nil, 没有操作被执行; 如果src和dst相同, 该操作相当于从列表中删除最后一个元素并将其作为列表的第一个元素push, 因此可以认为是列表旋转命令
 // 返回值类型: Bulk String, 被操作的元素(pop&push)
-func (c *Client) RPopLPush(src, dst string) (*pool.Reply, error) {
+func (c *Client) RPopLPush(src, dst string) (*Reply, error) {
 	cmd := args.Get()
 	cmd.Append("RPOPLPUSH", src, dst)
 	cmdBytes := cmd.Bytes()
