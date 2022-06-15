@@ -46,6 +46,10 @@ func (c *Client) Close() {
 	c.pool.Close()
 }
 
+func (c *Client) DoCommand(cmds ...interface{}) (*Reply, error) {
+	return c.sendCommand(args.Command(cmds...))
+}
+
 func (c *Client) sendCommandWithoutTimeout(cmd []byte) (result *Reply, err error) {
 	conn, err := c.pool.Get(c.checkConn)
 	if err != nil {

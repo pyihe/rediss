@@ -867,3 +867,61 @@ func (c *Client) Type(key string) (string, error) {
 	}
 	return reply.ValueString(), nil
 }
+
+// DBSize v1.0.0后可用
+// 命令格式: DBSIZE
+// 时间复杂度: O(1)
+// 返回当前数据库中的key数量
+// 返回值类型: Integer
+func (c *Client) DBSize() (int64, error) {
+	reply, err := c.sendCommand(args.Command("DBSIZE"))
+	if err != nil {
+		return 0, err
+	}
+	return reply.Integer()
+}
+
+// FlushAll v1.0.0后可用
+// 命令格式: FLUSHALL [ ASYNC | SYNC]
+// 历史:
+// v4.0.0开始增加ASYNC模式修饰符
+// v6.2.0开始增加SYNC模式修饰符
+// 时间复杂度: O(N), N为数据库中key的数量
+// 删除所有数据库中所有的key，默认情况下此命令将会同步地flush所有数据库，从v6.2版本开始设置'lazyfree-lazy-user-flush'配置项为yes将会改变flush模式为异步
+// 命令选项:
+// ASYNC: 异步flush所有数据库
+// SYNC: 同步flush所有数据库
+// 注意: 异步flush过程中，只会删除已经存在的key，flush期间创建的key将不会受影响
+// 返回值类型: Simple String
+func (c *Client) FlushAll(mode string) (err error) {
+	cmd := args.Get()
+	cmd.Append("FLUSHALL")
+	if mode != "" {
+		cmd.Append(mode)
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	_, err = c.sendCommand(cmdBytes)
+	return
+}
+
+// FlushDB v1.0.0后可用
+// 命令格式: FLUSHDB [ ASYNC | SYNC]
+// 历史:
+// v4.0.0开始增加ASYNC模式修饰符
+// v6.2.0开始增加SYNC模式修饰符
+// 删除当前数据库中所有的key，此命令永远不会失败
+// 返回值类型: Simple String
+func (c *Client) FlushDB(mode string) (err error) {
+	cmd := args.Get()
+	cmd.Append("FLUSHDB")
+	if mode != "" {
+		cmd.Append(mode)
+	}
+	cmdBytes := cmd.Bytes()
+	args.Put(cmd)
+
+	_, err = c.sendCommand(cmdBytes)
+	return
+}
