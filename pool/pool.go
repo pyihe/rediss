@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pyihe/go-pkg/backoff"
 	"github.com/pyihe/go-pkg/errors"
 	"github.com/pyihe/go-pkg/maths"
 )
@@ -93,19 +94,25 @@ func (p *Pool) addConn(c net.Conn) (err error) {
 func (p *Pool) dialConn() (c net.Conn, err error) {
 	c, err = p.config.Dialer()
 	if err != nil && p.config.Retry > 0 {
-		ticker := time.NewTicker(time.Second)
 		retry := 0
-		for retry < p.config.Retry {
+		for {
+			delay := backoff.Get(nil, retry)
+			timer := time.NewTimer(delay)
 			select {
-			case <-ticker.C:
-				c, err = p.config.Dialer()
+			case <-timer.C:
+				break
+			}
+			c, err = p.config.Dialer()
+			if err == nil {
+				timer.Stop()
+				break
 			}
 			retry++
-			if err == nil {
+			if retry == p.config.Retry {
+				timer.Stop()
 				break
 			}
 		}
-		ticker.Stop()
 	}
 	return
 }

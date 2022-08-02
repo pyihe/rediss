@@ -10,13 +10,13 @@ import (
 )
 
 type Client struct {
-	address      string               // redis地址
-	username     string               // 用户名
-	password     string               // 密码
-	database     int32                // db索引
-	writeTimeout time.Duration        // 每次发送请求的超时时间
-	readTimeout  time.Duration        // 每次读取回复的超时时间
-	serializer   serialize.Serializer // 序列化
+	address      string          // redis地址
+	username     string          // 用户名
+	password     string          // 密码
+	database     int32           // db索引
+	writeTimeout time.Duration   // 每次发送请求的超时时间
+	readTimeout  time.Duration   // 每次读取回复的超时时间
+	codec        serialize.Codec // 序列化
 
 	pool       *pool.Pool   // 连接池
 	poolConfig *pool.Config // 连接池配置

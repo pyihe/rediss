@@ -32,9 +32,9 @@ func WithDatabase(db int) Option {
 	}
 }
 
-func WithSerializer(serializer serialize.Serializer) Option {
+func WithSerializer(serializer serialize.Codec) Option {
 	return func(client *Client) {
-		client.serializer = serializer
+		client.codec = serializer
 	}
 }
 

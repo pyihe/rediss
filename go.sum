@@ -20,6 +20,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pyihe/go-pkg v0.0.0-20220526091214-2ae61155310d h1:RdEku7nDZ2X2Erbii+l6fcFC/sxO5fUr49dXxhvd6vk=
 github.com/pyihe/go-pkg v0.0.0-20220526091214-2ae61155310d/go.mod h1:+rQd1raZGz3jJ1zHn3I57qoYgCfPzQ1zZQ/3IVya5ck=
+github.com/pyihe/go-pkg v0.0.0-20220802064518-70b39c82121c h1:Q5lTjPr+3PZOBIEenvpUOL6QXqoB/GNgc9JpEgDjo2g=
+github.com/pyihe/go-pkg v0.0.0-20220802064518-70b39c82121c/go.mod h1:+rQd1raZGz3jJ1zHn3I57qoYgCfPzQ1zZQ/3IVya5ck=
 github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=

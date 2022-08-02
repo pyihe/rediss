@@ -59,8 +59,8 @@ func (reply *Reply) Float() (v float64, err error) {
 	return strconv.ParseFloat(bytes.String(reply.Value), 64)
 }
 
-func (reply *Reply) Unmarshal(serializer serialize.Serializer, dst interface{}) error {
-	return serializer.Decode(reply.Value, dst)
+func (reply *Reply) Unmarshal(serializer serialize.Codec, dst interface{}) error {
+	return serializer.Unmarshal(reply.Value, dst)
 }
 
 /************************************************************************************************************/
